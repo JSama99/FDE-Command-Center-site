@@ -1,0 +1,1568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FDE Command Center</title>
+<meta name="theme-color" content="#0a1230">
+<meta property="og:type" content="website">
+<meta property="og:title" content="FDE Command Center">
+<meta property="og:description" content="An AI implementation and failure-investigation copilot for forward-deployed engineers. Every recommendation has an assumption. Every failure has an investigation. Every claimed fix needs evidence.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="An AI implementation and failure-investigation copilot for forward-deployed engineers. Every recommendation has an assumption. Every failure has an investigation. Every claimed fix needs evidence.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an investigation desk. Wide instrument panels on a deep navy field, one
+   accent (signal cyan) for live controls, gold reserved for locked records.
+   Semantic status hues always travel with a glyph and a word. */
+:root {
+  --field: #060b1a;
+  --field-2: #0a1230;
+  --panel: #0e1838;
+  --panel-2: #13204a;
+  --stroke: rgba(140, 180, 255, 0.20);
+  --stroke-strong: rgba(140, 180, 255, 0.38);
+  --ink: #e8eefc;
+  --ink-dim: #b3bedc;
+  --ink-faint: #8e9cc4;
+  --signal: #46e0e0;
+  --signal-ink: #04161a;
+  --signal-glow: rgba(70, 224, 224, 0.16);
+  --lock: #e8b64c;
+  --lock-glow: rgba(232, 182, 76, 0.14);
+  --ok: #6fdc9f;
+  --miss: #ff8f80;
+  --open: #b8abff;
+  --anom: #e8b64c;
+
+  --font-display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.86rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.08rem);
+  --step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.45rem);
+  --step-2: clamp(1.5rem, 1.25rem + 1.2vw, 2.2rem);
+  --step-3: clamp(2.1rem, 1.5rem + 2.8vw, 3.9rem);
+  --step-4: clamp(2.6rem, 1.6rem + 4.6vw, 5.4rem);
+
+  --radius: 14px;
+  --wrap: 1180px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  color: var(--ink);
+  background:
+    radial-gradient(52em 26em at 8% -4%, rgba(70, 224, 224, 0.09), transparent 62%),
+    radial-gradient(60em 32em at 92% 4%, rgba(26, 143, 160, 0.22), transparent 62%),
+    radial-gradient(54em 30em at -12% 46%, rgba(70, 60, 180, 0.20), transparent 62%),
+    linear-gradient(180deg, #0b1431 0%, var(--field-2) 30%, var(--field) 100%);
+  background-color: var(--field);
+  overflow-x: hidden;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 30; background: var(--field-2);
+}
+
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: var(--wrap); margin: 0 auto; }
+
+a { color: var(--signal); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 6px; }
+::selection { background: var(--signal); color: var(--signal-ink); }
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; line-height: 1.04; margin: 0; text-wrap: balance; }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-1); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+p { margin: 0; }
+.lede { color: var(--ink-dim); font-size: var(--step-1); line-height: 1.5; max-width: 38em; text-wrap: pretty; }
+.prose { color: var(--ink-dim); max-width: 62ch; text-wrap: pretty; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--signal); display: inline-flex; gap: 0.6em; align-items: center;
+}
+.eyebrow::before { content: ""; width: 1.6em; height: 1px; background: currentColor; opacity: 0.7; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- Header ---------- */
+.site-head {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: rgba(10, 18, 48, 0.82);
+  border-bottom: 1px solid var(--stroke);
+}
+@supports (backdrop-filter: blur(2px)) {
+  .site-head { background: rgba(10, 18, 48, 0.62); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
+}
+.site-head .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.8rem; }
+.brand { display: flex; align-items: center; gap: 0.7rem; text-decoration: none; color: var(--ink); }
+.brand-mark { width: 30px; height: 30px; flex: none; }
+.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 1.12rem; letter-spacing: -0.01em; line-height: 1; }
+.brand-name small { display: block; font-family: var(--font-mono); font-weight: 400; font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-top: 0.25rem; }
+.head-nav { display: flex; align-items: center; gap: 1.4rem; }
+.head-nav a.navlink { color: var(--ink-dim); text-decoration: none; font-size: 0.92rem; }
+.head-nav a.navlink:hover { color: var(--ink); }
+@media (max-width: 900px) { .head-nav a.navlink { display: none; } }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.55em; justify-content: center;
+  font: 600 0.95rem/1 var(--font-body); text-decoration: none; cursor: pointer;
+  padding: 0.8em 1.15em; border-radius: 999px; border: 1px solid var(--stroke-strong);
+  background: transparent; color: var(--ink);
+  transition: background-color .2s, border-color .2s, color .2s, transform .2s;
+}
+.btn:hover { border-color: var(--signal); color: var(--signal); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
+.btn.primary:hover { background: #7aeeee; color: var(--signal-ink); }
+.btn.lock { border-color: var(--lock); color: var(--lock); }
+.btn.lock:hover { background: var(--lock-glow); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.btn svg { width: 1.05em; height: 1.05em; flex: none; }
+
+/* ---------- Hero ---------- */
+.hero .wrap {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(2rem, 4vw, 4.5rem);
+  align-items: center; padding-block: clamp(3rem, 7vw, 6.5rem) clamp(3rem, 6vw, 5rem);
+}
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } }
+.hero h1 { font-size: var(--step-4); margin: 1.1rem 0 1.4rem; }
+.hero h1 .line { display: block; }
+.hero h1 .claim { color: var(--ink-dim); font-weight: 600; }
+.hero h1 em { font-style: normal; color: var(--signal); }
+.hero .ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 2rem; }
+.hero .fine { margin-top: 1.4rem; font-size: var(--step--1); color: var(--ink-faint); max-width: 46em; }
+
+/* Readout: the signature instrument */
+.readout {
+  position: relative; border-radius: 20px; padding: clamp(1.2rem, 2.4vw, 1.8rem);
+  background: linear-gradient(160deg, rgba(19, 32, 74, 0.92), rgba(10, 18, 48, 0.94));
+  border: 1px solid var(--stroke-strong);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.readout::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(28em 12em at 80% -10%, var(--signal-glow), transparent 70%);
+  transition: opacity .5s;
+}
+.readout[data-mode="verified"]::after { background: radial-gradient(28em 12em at 80% -10%, rgba(255, 143, 128, 0.14), transparent 70%); }
+.readout-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; position: relative; z-index: 1; }
+.readout-label { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 1.5; }
+.readout-label b { display: block; color: var(--ink-dim); font-weight: 500; letter-spacing: 0.06em; }
+
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--stroke-strong); background: rgba(6, 11, 26, 0.6); }
+.seg button {
+  font: 500 0.8rem/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-dim); background: transparent;
+  border: 0; border-radius: 999px; padding: 0.6em 0.95em; cursor: pointer; transition: background-color .25s, color .25s;
+}
+.seg button[aria-checked="true"] { background: var(--signal); color: var(--signal-ink); }
+.seg button:hover:not([aria-checked="true"]) { color: var(--ink); }
+
+.big { position: relative; z-index: 1; display: flex; align-items: baseline; gap: 0.12em; margin: 1.4rem 0 0.4rem;
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(4.6rem, 3rem + 7vw, 8.4rem); line-height: 0.9; letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums; color: var(--ink); }
+.big .unit { font-size: 0.42em; color: var(--ink-dim); letter-spacing: -0.02em; }
+.readout[data-mode="verified"] .big { color: var(--miss); }
+.big-sub { position: relative; z-index: 1; color: var(--ink-dim); min-height: 3.2em; font-size: 0.98rem; }
+.big-sub .src { display: block; margin-top: 0.35rem; font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); }
+
+.cells { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 1.3rem; }
+.cell {
+  border-radius: 8px; padding: 0.55rem 0.3rem 0.5rem; text-align: center;
+  border: 1px solid var(--stroke); background: rgba(6, 11, 26, 0.5);
+  font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); line-height: 1.2;
+  transition: border-color .35s, background-color .35s, color .35s;
+}
+.cell .g { display: block; font-size: 1.05rem; line-height: 1.1; margin-bottom: 0.2rem; color: var(--ink); }
+.cell[data-s="ok"], .cell[data-s="dash"] { border-color: rgba(111, 220, 159, 0.5); }
+.cell[data-s="ok"] .g, .cell[data-s="dash"] .g { color: var(--ok); }
+.cell[data-s="miss"] { border-color: rgba(255, 143, 128, 0.55); background: rgba(255, 143, 128, 0.08); }
+.cell[data-s="miss"] .g { color: var(--miss); }
+.cell[data-s="open"] { border-color: rgba(184, 171, 255, 0.5); }
+.cell[data-s="open"] .g { color: var(--open); }
+.cell[data-s="anom"] { border-color: rgba(232, 182, 76, 0.55); }
+.cell[data-s="anom"] .g { color: var(--anom); }
+.legend { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.9rem; font-size: 0.78rem; color: var(--ink-faint); font-family: var(--font-mono); }
+.legend span b { font-weight: 500; }
+.legend .k-ok b { color: var(--ok); } .legend .k-miss b { color: var(--miss); } .legend .k-open b { color: var(--open); } .legend .k-anom b { color: var(--anom); }
+
+/* ---------- Section frame ---------- */
+section.band { padding-block: clamp(4rem, 9vw, 7.5rem); }
+.band-head { display: grid; gap: 1.1rem; margin-bottom: clamp(2rem, 4vw, 3.2rem); max-width: 50rem; }
+.rule-top { border-top: 1px solid var(--stroke); }
+
+/* Principle */
+.principle .wrap { display: grid; gap: clamp(1.2rem, 2.5vw, 2rem); }
+.principle-line {
+  display: grid; grid-template-columns: minmax(7rem, 14rem) minmax(0, 1fr); gap: 1.2rem 2rem; align-items: baseline;
+  padding-block: clamp(1rem, 2vw, 1.6rem); border-top: 1px solid var(--stroke);
+}
+.principle-line:last-child { border-bottom: 1px solid var(--stroke); }
+.principle-line .tag { font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.principle-line p { font-family: var(--font-display); font-weight: 600; font-size: var(--step-2); line-height: 1.12; letter-spacing: -0.02em; }
+.principle-line p em { font-style: normal; color: var(--signal); }
+@media (max-width: 640px) { .principle-line { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Audit table ---------- */
+.audit-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 1.4rem; align-items: start; }
+@media (max-width: 980px) { .audit-grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: rgba(14, 24, 56, 0.72); border: 1px solid var(--stroke); border-radius: var(--radius); }
+.panel-pad { padding: clamp(1rem, 2vw, 1.4rem); }
+.panel-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.9rem clamp(1rem, 2vw, 1.4rem); border-bottom: 1px solid var(--stroke); }
+.filename { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-dim); }
+.filename b { color: var(--ink); font-weight: 500; }
+
+.table-scroll { overflow-x: auto; }
+table.log { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.82rem; font-variant-numeric: tabular-nums; min-width: 640px; }
+table.log th { text-align: left; font-weight: 500; color: var(--ink-faint); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--stroke); white-space: nowrap; }
+table.log td { padding: 0.62rem 0.8rem; border-bottom: 1px solid rgba(140, 180, 255, 0.10); white-space: nowrap; color: var(--ink); }
+table.log tbody tr { cursor: pointer; transition: background-color .2s; }
+table.log tbody tr:hover { background: rgba(70, 224, 224, 0.05); }
+table.log tbody tr[aria-selected="true"] { background: rgba(70, 224, 224, 0.10); box-shadow: inset 2px 0 0 var(--signal); }
+table.log tbody tr:last-child td { border-bottom: 0; }
+td.blank { color: var(--ink-faint); }
+.routine td { color: var(--ink-faint); }
+
+.pill { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.22em 0.62em; border-radius: 999px; font-size: 0.74rem; border: 1px solid currentColor; line-height: 1.3; }
+.pill[data-s="ok"], .pill[data-s="dash"] { color: var(--ok); }
+.pill[data-s="miss"] { color: var(--miss); }
+.pill[data-s="open"] { color: var(--open); }
+.pill[data-s="anom"] { color: var(--anom); }
+.pill[data-s="na"] { color: var(--ink-faint); border-style: dashed; }
+
+.counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.6rem; padding: clamp(1rem, 2vw, 1.4rem); border-top: 1px solid var(--stroke); }
+.count { padding: 0.7rem 0.8rem; border-radius: 10px; border: 1px solid var(--stroke); }
+.count .n { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.count .l { font-size: 0.76rem; color: var(--ink-dim); margin-top: 0.3rem; line-height: 1.35; }
+.count[data-s="ok"] .n { color: var(--ok); } .count[data-s="miss"] .n { color: var(--miss); }
+.count[data-s="open"] .n { color: var(--open); } .count[data-s="anom"] .n { color: var(--anom); }
+
+.trace h3 { margin-bottom: 0.3rem; }
+.trace .sub { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 1rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.checks li { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 0.5rem; padding: 0.65rem 0.75rem; border-radius: 10px; background: rgba(6, 11, 26, 0.5); border: 1px solid var(--stroke); font-size: 0.9rem; }
+.checks li .gl { font-family: var(--font-mono); font-weight: 500; text-align: center; }
+.checks li[data-r="pass"] .gl { color: var(--ok); }
+.checks li[data-r="fail"] .gl { color: var(--miss); }
+.checks li[data-r="skip"] .gl { color: var(--ink-faint); }
+.checks li[data-r="warn"] .gl { color: var(--anom); }
+.checks li small { display: block; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.74rem; margin-top: 0.15rem; }
+.verdict { margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid currentColor; display: grid; gap: 0.25rem; }
+.verdict b { font-family: var(--font-display); font-size: 1.15rem; }
+.verdict span { color: var(--ink-dim); font-size: 0.9rem; }
+.verdict[data-s="ok"] { color: var(--ok); } .verdict[data-s="miss"] { color: var(--miss); }
+.verdict[data-s="open"] { color: var(--open); } .verdict[data-s="anom"] { color: var(--anom); } .verdict[data-s="na"] { color: var(--ink-faint); }
+
+.contra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.4rem; }
+@media (max-width: 760px) { .contra { grid-template-columns: minmax(0, 1fr); } }
+.contra figure { margin: 0; padding: 1.1rem 1.2rem; }
+.contra blockquote { margin: 0 0 0.7rem; font-family: var(--font-display); font-weight: 600; font-size: var(--step-1); line-height: 1.25; letter-spacing: -0.01em; }
+.contra figcaption { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-faint); }
+.contra .computed { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed var(--stroke-strong); font-size: 0.9rem; color: var(--ink-dim); }
+.contra .computed b { color: var(--miss); font-weight: 600; }
+
+/* ---------- Quote verifier ---------- */
+.verify-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.4rem; }
+@media (max-width: 900px) { .verify-grid { grid-template-columns: minmax(0, 1fr); } }
+.doc-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.doc-tabs button { font: 500 0.78rem/1 var(--font-mono); padding: 0.55em 0.85em; border-radius: 8px; border: 1px solid var(--stroke); background: transparent; color: var(--ink-dim); cursor: pointer; }
+.doc-tabs button[aria-selected="true"] { border-color: var(--signal); color: var(--signal); background: var(--signal-glow); }
+.doc {
+  font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+  padding: clamp(1rem, 2vw, 1.4rem); margin: 0; color: var(--ink-dim); max-height: 22rem; overflow: auto;
+}
+.doc mark { background: rgba(70, 224, 224, 0.20); color: var(--ink); border-radius: 3px; box-shadow: 0 0 0 2px rgba(70, 224, 224, 0.20); }
+.field-label { display: block; font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 0.5rem; }
+textarea, input[type="text"] {
+  width: 100%; font: 400 0.95rem/1.5 var(--font-body); color: var(--ink); background: rgba(6, 11, 26, 0.7);
+  border: 1px solid var(--stroke-strong); border-radius: 10px; padding: 0.75rem 0.9rem; resize: vertical;
+}
+textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-glow); }
+.vresult { margin-top: 1rem; padding: 1rem 1.1rem; border-radius: 12px; border: 1px solid currentColor; display: grid; gap: 0.3rem; }
+.vresult b { font-family: var(--font-display); font-size: 1.2rem; }
+.vresult .meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-dim); }
+.vresult[data-r="pass"] { color: var(--ok); }
+.vresult[data-r="fail"] { color: var(--miss); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.9rem; }
+.chip { font: 500 0.78rem/1 var(--font-body); padding: 0.55em 0.8em; border-radius: 999px; border: 1px solid var(--stroke-strong); background: transparent; color: var(--ink-dim); cursor: pointer; }
+.chip:hover { border-color: var(--signal); color: var(--signal); }
+
+/* ---------- Prediction lock ---------- */
+.exp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.4rem; align-items: start; }
+@media (max-width: 900px) { .exp-grid { grid-template-columns: minmax(0, 1fr); } }
+.q { font-family: var(--font-display); font-weight: 600; font-size: var(--step-1); line-height: 1.3; margin-bottom: 1rem; }
+.hyps { display: grid; gap: 0.6rem; margin-bottom: 1.2rem; }
+.hyp { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.8rem; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--stroke); cursor: pointer; transition: border-color .2s, background-color .2s; }
+.hyp:hover { border-color: var(--stroke-strong); }
+.hyp:has(input:checked) { border-color: var(--signal); background: var(--signal-glow); }
+.hyp:has(input:disabled) { cursor: default; }
+.hyp input { accent-color: var(--signal); margin-top: 0.3rem; width: 1.05rem; height: 1.05rem; }
+.hyp .id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--signal); }
+.hyp .t { display: block; font-size: 0.92rem; color: var(--ink-dim); }
+.hyp .pred { display: block; font-family: var(--font-display); font-weight: 600; color: var(--ink); margin: 0.1rem 0 0.15rem; }
+.exp-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.1rem; }
+
+.ledger { display: grid; gap: 0; }
+.entry { position: relative; padding: 0 0 1.3rem 1.6rem; border-left: 1px solid var(--stroke-strong); margin-left: 0.45rem; }
+.entry:last-child { border-left-color: transparent; padding-bottom: 0; }
+.entry::before { content: ""; position: absolute; left: -0.45rem; top: 0.25rem; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--field); border: 2px solid var(--ink-faint); }
+.entry[data-on="true"]::before { border-color: var(--signal); background: var(--signal); }
+.entry[data-k="lock"][data-on="true"]::before { border-color: var(--lock); background: var(--lock); }
+.entry h4 { margin: 0 0 0.25rem; font: 600 0.95rem/1.3 var(--font-body); color: var(--ink); }
+.entry[data-on="false"] h4 { color: var(--ink-faint); }
+.entry .body { font-size: 0.88rem; color: var(--ink-dim); }
+.record { margin-top: 0.55rem; font-family: var(--font-mono); font-size: 0.74rem; line-height: 1.6; background: rgba(6, 11, 26, 0.65); border: 1px solid rgba(232, 182, 76, 0.45); border-radius: 10px; padding: 0.75rem 0.85rem; color: var(--ink-dim); overflow-wrap: anywhere; }
+.record b { color: var(--lock); font-weight: 500; }
+.assess { margin-top: 0.55rem; padding: 0.8rem 0.9rem; border-radius: 10px; border: 1px solid currentColor; }
+.assess[data-r="supported"] { color: var(--ok); }
+.assess[data-r="contradicted"] { color: var(--miss); }
+.assess b { font-family: var(--font-display); font-size: 1.1rem; display: block; }
+.assess span { color: var(--ink-dim); font-size: 0.86rem; display: block; margin-top: 0.2rem; }
+.note { font-size: 0.8rem; color: var(--ink-faint); margin-top: 1rem; }
+
+/* ---------- Mission route ---------- */
+.route-wrap { position: relative; }
+.route { display: grid; gap: 0; counter-reset: stage; list-style: none; margin: 0; padding: 0; }
+.route-rail { position: absolute; left: 1.15rem; top: 0.6rem; bottom: 0.6rem; width: 2px; background: var(--stroke); border-radius: 2px; }
+.route-fill { position: absolute; inset: 0 0 auto 0; height: 100%; background: linear-gradient(var(--signal), var(--lock)); border-radius: 2px; transform-origin: top; }
+.stage { position: relative; display: grid; grid-template-columns: 2.3rem minmax(0, 12rem) minmax(0, 1fr); gap: 0.4rem 1.4rem; align-items: baseline; padding: 1rem 0; }
+.stage::before {
+  counter-increment: stage; content: counter(stage, decimal-leading-zero);
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink); z-index: 1;
+  width: 2.3rem; height: 2.3rem; display: grid; place-items: center; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--stroke-strong); align-self: center;
+}
+.stage h3 { font-size: var(--step-1); }
+.stage p { color: var(--ink-dim); max-width: 56ch; }
+.stage .k { display: inline-block; margin-top: 0.35rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }
+@media (max-width: 720px) {
+  .stage { grid-template-columns: 2.3rem minmax(0, 1fr); }
+  .stage p { grid-column: 2; }
+}
+
+
+/* ---------- Chaos Lab ---------- */
+.chaos-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 1rem; }
+@media (max-width: 760px) { .chaos-tabs { grid-template-columns: minmax(0, 1fr); } }
+.chaos-tab { text-align: left; cursor: pointer; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(14, 24, 56, 0.6); color: var(--ink-dim); font: inherit; transition: border-color .2s, background-color .2s; display: grid; gap: 0.2rem; }
+.chaos-tab:hover { border-color: var(--stroke-strong); }
+.chaos-tab[aria-selected="true"] { border-color: var(--signal); background: var(--signal-glow); color: var(--ink); }
+.chaos-tab .sid { font-family: var(--font-mono); font-size: 0.74rem; color: var(--signal); letter-spacing: 0.04em; }
+.chaos-tab .ttl { font-family: var(--font-display); font-weight: 600; font-size: 1.08rem; color: var(--ink); }
+.chaos-tab .st { font-size: 0.8rem; }
+.chaos-tab .st[data-s="ok"] { color: var(--ok); } .chaos-tab .st[data-s="na"] { color: var(--ink-faint); }
+table.chaos-log { min-width: 560px; }
+table.chaos-log th, table.chaos-log td { padding-left: 0.55rem; padding-right: 0.55rem; }
+.chaos-grid { grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); }
+@media (max-width: 980px) { .chaos-grid { grid-template-columns: minmax(0, 1fr); } }
+#runId { text-transform: none; letter-spacing: 0; color: var(--ink-dim); }
+table.chaos-log tbody tr { cursor: default; }
+table.chaos-log tbody tr:hover { background: transparent; }
+td.changed { color: var(--miss); }
+td.restored { color: var(--ok); }
+td .was { color: var(--ink-faint); text-decoration: line-through; margin-right: 0.45em; }
+.flag { color: var(--lock); font-family: var(--font-mono); }
+.chaos-fault { padding: 0.9rem clamp(1rem, 2vw, 1.4rem); border-top: 1px solid var(--stroke); color: var(--ink-dim); font-size: 0.9rem; }
+.chaos-fault b { color: var(--ink); font-weight: 600; }
+.changes { list-style: none; margin: 0.4rem 0 0.9rem; padding: 0.7rem 0.8rem; border-radius: 10px; background: rgba(6, 11, 26, 0.65); border: 1px solid var(--stroke); font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-dim); display: grid; gap: 0.25rem; overflow-wrap: anywhere; }
+.flags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.35rem 0 0.9rem; }
+.flags .none { color: var(--ink-faint); font-size: 0.86rem; }
+.flags code { font-family: var(--font-mono); font-size: 0.76rem; padding: 0.25em 0.55em; border-radius: 6px; border: 1px solid rgba(232, 182, 76, 0.5); color: var(--lock); }
+.side-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-top: 0.2rem; }
+.side-rule { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); margin: 0.2rem 0 0.8rem; }
+.scoreboard { margin-top: 1.4rem; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.4fr); gap: 0; }
+@media (max-width: 980px) { .scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); } .score.extra { grid-column: 1 / -1; border-right: 0; } }
+.score { padding: 1rem 1.1rem; border-right: 1px solid var(--stroke); border-bottom: 1px solid var(--stroke); display: grid; gap: 0.2rem; align-content: start; }
+.score .n { font-family: var(--font-display); font-weight: 800; font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.score .l { font-size: 0.8rem; color: var(--ink-dim); line-height: 1.35; }
+.score[data-s="ok"] .n { color: var(--ok); } .score[data-s="miss"] .n { color: var(--miss); }
+.score.wide { grid-column: 1 / -1; border-right: 0; border-bottom: 0; color: var(--ink-dim); font-size: 0.86rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; }
+.score.wide b { color: var(--ink); font-weight: 600; }
+.score.extra .n { font-size: 1.35rem; }
+
+/* ---------- Mission Control chips ---------- */
+.ws-chips { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.ws-chips li { padding: 0.5rem 0.8rem; border-radius: 10px; border: 1px solid var(--stroke); font-size: 0.82rem; color: var(--ink-faint); }
+.ws-chips li b { display: block; color: var(--ink); font-weight: 600; font-size: 0.9rem; }
+
+/* ---------- Records ---------- */
+.records-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 1.4rem; align-items: start; }
+@media (max-width: 980px) { .records-grid { grid-template-columns: minmax(0, 1fr); } }
+.revs { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.45rem; }
+.revs li { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto; gap: 0.7rem; align-items: center; padding: 0.6rem 0.75rem; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(6, 11, 26, 0.5); font-size: 0.9rem; }
+.revs .r { font-family: var(--font-mono); font-size: 0.74rem; color: var(--lock); }
+.revs .sg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }
+.revs li.restart { border-style: dashed; border-color: rgba(111, 220, 159, 0.55); }
+.revs li.restart .r { color: var(--ok); }
+.lifecycle { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-family: var(--font-mono); }
+.lifecycle .arrow, .lifecycle .or { color: var(--ink-faint); font-size: 0.8rem; }
+.term-body { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.65; padding: clamp(1rem, 2vw, 1.3rem); overflow-x: auto; display: grid; gap: 0.1rem; background: rgba(4, 8, 20, 0.6); }
+.term-body .ln { white-space: pre-wrap; overflow-wrap: anywhere; }
+.term-body .cmd { color: var(--ink); margin-top: 0.55rem; }
+.term-body .cmd:first-child { margin-top: 0; }
+.term-body .cmd::before { content: "$ "; color: var(--signal); }
+.term-body .ok { color: var(--ok); }
+.term-body .req { color: var(--ink-dim); }
+.term-body .bad { color: var(--miss); }
+.term-foot { padding: 0.8rem clamp(1rem, 2vw, 1.3rem); border-top: 1px solid var(--stroke); font-size: 0.8rem; color: var(--ink-faint); }
+.btn.small { padding: 0.5em 0.9em; font-size: 0.82rem; }
+
+/* ---------- Boundary ---------- */
+.lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 900px) { .lanes { grid-template-columns: minmax(0, 1fr); } }
+.lane { padding: clamp(1.2rem, 2.2vw, 1.6rem); display: grid; gap: 0.9rem; align-content: start; }
+.lane .who { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.lane:nth-child(1) .who { color: var(--signal); }
+.lane:nth-child(2) .who { color: var(--ink-dim); }
+.lane:nth-child(3) .who { color: var(--lock); }
+.lane h3 { font-size: var(--step-2); }
+.lane ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.55rem; }
+.lane li { color: var(--ink-dim); font-size: 0.93rem; padding-left: 1.1rem; position: relative; }
+.lane li::before { content: "›"; position: absolute; left: 0; color: var(--ink-faint); font-family: var(--font-mono); }
+.lane.human { border-color: rgba(232, 182, 76, 0.45); }
+
+/* ---------- Facts ---------- */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 900px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .facts { grid-template-columns: minmax(0, 1fr); } }
+.fact { padding: 1.1rem 1.2rem; display: grid; gap: 0.35rem; align-content: start; }
+.fact .v { font-family: var(--font-display); font-weight: 800; font-size: var(--step-2); line-height: 1; letter-spacing: -0.02em; }
+.fact .d { font-size: 0.88rem; color: var(--ink-dim); }
+
+/* ---------- Closing ---------- */
+.closing .wrap { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 2rem; align-items: end; }
+@media (max-width: 860px) { .closing .wrap { grid-template-columns: minmax(0, 1fr); } }
+.closing h2 { font-size: var(--step-4); }
+.closing .ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.runbox { padding: 1rem 1.1rem; font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink-dim); }
+.runbox code { color: var(--ink); }
+.runbox .c { color: var(--ink-faint); }
+
+footer.site-foot { padding-block: 2rem 2.6rem; border-top: 1px solid var(--stroke); color: var(--ink-faint); font-size: 0.82rem; }
+footer.site-foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; }
+
+/* ---------- Motion tier 2: CSS scroll-driven reveal (degrades to visible) ---------- */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+    @keyframes rise { from { opacity: 0.6; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  }
+}
+.js-gsap .reveal { animation: none; }
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+</head>
+<body>
+<header class="site-head gutter">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="FDE Command Center, back to top">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="8" fill="#0e1838" stroke="#46e0e0" stroke-opacity="0.6"/>
+        <path d="M8 21 L13 15 L17 18 L24 10" fill="none" stroke="#46e0e0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="24" cy="10" r="2.6" fill="#e8b64c"/>
+      </svg>
+      <span class="brand-name">FDE Command Center<small>Failure investigation copilot</small></span>
+    </a>
+    <nav class="head-nav" aria-label="Page sections">
+      <a class="navlink" href="#audit">Audit</a>
+      <a class="navlink" href="#quotes">Quotes</a>
+      <a class="navlink" href="#lock">Prediction</a>
+      <a class="navlink" href="#chaos">Chaos Lab</a>
+      <a class="navlink" href="#records">Records</a>
+      <a class="btn" href="https://github.com/JSama99/fde-command-center" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero gutter" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">For forward-deployed engineers</span>
+      <h1 id="hero-title">
+        <span class="line claim">The dashboard says 100%.</span>
+        <span class="line">The event log says <em>1&nbsp;in&nbsp;7</em>.</span>
+      </h1>
+      <p class="lede">FDE Command Center is an investigation assistant for forward-deployed engineers. It explains why a business system misses its outcomes while the technical system looks healthy. It separates what people say from what the records show, makes you lock a prediction before you look, and calls nothing fixed until a retest proves it.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#audit">Run the audit
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="btn" href="https://github.com/JSama99/fde-command-center" target="_blank" rel="noopener">Read the source</a>
+      </div>
+      <p class="fine">Training demonstration on a fictional case. All people, companies, and events are invented, and nothing on this page changes a production system.</p>
+    </div>
+
+    <div class="readout" id="readout" data-mode="dashboard" aria-live="polite">
+      <div class="readout-top">
+        <div class="readout-label"><b>On-time acknowledgment</b>Urgent referrals · case-001</div>
+        <div class="seg" data-kind="mode" role="radiogroup" aria-label="Source of the number">
+          <button type="button" role="radio" aria-checked="true" data-mode="dashboard">Dashboard</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="verified">Event log</button>
+        </div>
+      </div>
+      <div class="big"><span id="bigNum">100</span><span class="unit">%</span></div>
+      <p class="big-sub" id="bigSub"></p>
+      <div class="cells" id="cells" aria-hidden="true"></div>
+      <div class="legend" id="legend" hidden>
+        <span class="k-ok"><b>✓</b> valid ack</span>
+        <span class="k-miss"><b>✕</b> confirmed miss</span>
+        <span class="k-open"><b>○</b> incomplete window</span>
+        <span class="k-anom"><b>!</b> needs source check</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRINCIPLE ================= -->
+<section class="band principle gutter rule-top" aria-labelledby="principle-title">
+  <div class="wrap">
+    <h2 id="principle-title" class="visually-hidden">Operating principle</h2>
+    <div class="principle-line reveal"><span class="tag">Recommendations</span><p>Every recommendation has an <em>assumption</em>.</p></div>
+    <div class="principle-line reveal"><span class="tag">Failures</span><p>Every failure has an <em>investigation</em>.</p></div>
+    <div class="principle-line reveal"><span class="tag">Fixes</span><p>Every claimed fix needs <em>evidence</em>.</p></div>
+  </div>
+</section>
+
+<!-- ================= AUDIT ================= -->
+<section class="band gutter" id="audit" aria-labelledby="audit-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Deterministic calculation</span>
+      <h2 id="audit-title">Same eight rows. Fixed rules. No model judgment.</h2>
+      <p class="prose">The policy says urgent referrals get a coordinator within 1 hour and a recorded acknowledgment within 4. Switch the readout to the event log and every row is classified by those rules. Select a row to see each check it passed or failed.</p>
+    </div>
+
+    <div class="audit-grid">
+      <div class="panel reveal">
+        <div class="panel-bar">
+          <span class="filename">fixtures/case-001/<b>events.csv</b> · 8 rows</span>
+          <div class="seg" data-kind="mode" role="radiogroup" aria-label="Status column source">
+            <button type="button" role="radio" aria-checked="true" data-mode="dashboard">Dashboard</button>
+            <button type="button" role="radio" aria-checked="false" data-mode="verified">Event log</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="log" aria-describedby="audit-title">
+            <thead><tr><th scope="col">Case</th><th scope="col">Triage</th><th scope="col">Created</th><th scope="col">Assigned</th><th scope="col">Ack</th><th scope="col">Window closes</th><th scope="col">Status</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <div class="counts" id="counts"></div>
+      </div>
+
+      <aside class="panel panel-pad trace reveal" id="trace" aria-live="polite"></aside>
+    </div>
+
+    <div class="contra">
+      <figure class="panel reveal">
+        <blockquote id="qManager1"></blockquote>
+        <figcaption id="qManager1Cap"></figcaption>
+        <div class="computed" id="cAssign"></div>
+      </figure>
+      <figure class="panel reveal">
+        <blockquote id="qManager2"></blockquote>
+        <figcaption id="qManager2Cap"></figcaption>
+        <div class="computed" id="cAck"></div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUOTES ================= -->
+<section class="band gutter rule-top" id="quotes" aria-labelledby="quotes-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Verified quotation</span>
+      <h2 id="quotes-title">Every quote carries its coordinates.</h2>
+      <p class="prose">A quotation counts as evidence only if it appears in the source document character for character. It is stored with its document id and offsets. Change a single word below and it is rejected, so an AI summary cannot pass off a paraphrase as a quote.</p>
+    </div>
+    <div class="verify-grid">
+      <div class="panel reveal">
+        <div class="panel-bar">
+          <div class="doc-tabs" role="tablist" aria-label="Source documents" id="docTabs"></div>
+        </div>
+        <pre class="doc" id="docView" tabindex="0" aria-label="Source document text"></pre>
+      </div>
+      <div class="panel panel-pad reveal">
+        <label class="field-label" for="quoteInput">Quotation to verify</label>
+        <textarea id="quoteInput" rows="3" spellcheck="false"></textarea>
+        <div class="vresult" id="vResult" aria-live="polite"></div>
+        <div class="chips" id="quoteChips" aria-label="Try an example"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LOCK ================= -->
+<section class="band gutter rule-top" id="lock" aria-labelledby="lock-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Experiment EXP-001</span>
+      <h2 id="lock-title">Commit to a prediction before you see the answer.</h2>
+      <p class="prose">Case-003 was assigned at 09:10 and the events feed shows no acknowledgment. One explanation blames queue handling. The other says acknowledgments happen but never reach the feed. The source log settles it, and its contents stay sealed until your prediction is locked and hashed.</p>
+    </div>
+
+    <div class="exp-grid">
+      <form class="panel panel-pad reveal" id="expForm" novalidate>
+        <p class="q">Does the case-003 source log hold an acknowledgment that never reached the feed?</p>
+        <fieldset class="hyps" style="border:0;margin:0 0 1.2rem;padding:0">
+          <legend class="field-label">Your prediction</legend>
+          <label class="hyp"><input type="radio" name="finding" id="predAck" value="ack-found">
+            <span><span class="id">H-ACK</span><span class="pred">ack-found</span><span class="t" id="hAckText"></span></span></label>
+          <label class="hyp"><input type="radio" name="finding" id="predNoAck" value="no-ack">
+            <span><span class="id">H-QUEUE</span><span class="pred">no-ack</span><span class="t" id="hQueueText"></span></span></label>
+        </fieldset>
+        <label class="field-label" for="obsInput">What you expect to observe</label>
+        <textarea id="obsInput" rows="3"></textarea>
+        <div class="exp-actions">
+          <button type="submit" class="btn lock" id="lockBtn">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Lock prediction</button>
+          <button type="button" class="btn" id="revealBtn" disabled>Reveal source log</button>
+          <button type="button" class="btn" id="resetBtn" hidden>Start over</button>
+        </div>
+        <p class="note" id="expMsg" role="status"></p>
+      </form>
+
+      <div class="panel panel-pad reveal">
+        <span class="field-label">Investigation record</span>
+        <div class="ledger" id="ledger"></div>
+        <p class="note">This page runs the lock in your browser so you can try it. In the product the server holds the outcome, refuses a reveal before a valid lock, and keeps the outcome out of model context and every file sent to the browser.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CHAOS LAB ================= -->
+<section class="band gutter rule-top" id="chaos" aria-labelledby="chaos-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Chaos Lab · synthetic fault injection</span>
+      <h2 id="chaos-title">Break it on purpose. Fix it. Then prove the fix.</h2>
+      <p class="prose">Three controlled faults run against small synthetic fixtures. A rule-based detector has to catch each one, an allowlisted repair has to undo it, and a retest has to pass every regression check before anything counts as recovered. Where no honest repair exists, the result says not tested.</p>
+    </div>
+    <div class="chaos-tabs" role="tablist" aria-label="Chaos scenarios" id="chaosTabs"></div>
+    <div class="audit-grid chaos-grid">
+      <div class="panel reveal">
+        <div class="panel-bar">
+          <span class="filename" id="chaosFile"></span>
+          <div class="seg" data-kind="stage" role="radiogroup" aria-label="Experiment stage" id="chaosStages"></div>
+        </div>
+        <div class="table-scroll"><table class="log chaos-log" id="chaosTable"></table></div>
+        <p class="chaos-fault" id="chaosFault"></p>
+      </div>
+      <aside class="panel panel-pad trace reveal" id="chaosSide" aria-live="polite"></aside>
+    </div>
+    <div class="panel scoreboard reveal" id="scoreboard"></div>
+  </div>
+</section>
+
+<!-- ================= ROUTE ================= -->
+<section class="band gutter rule-top" id="route" aria-labelledby="route-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Mission Control · five workspaces</span>
+      <h2 id="route-title">One case, from brief to engineering record.</h2>
+      <p class="prose">Mission Control gathers the investigation into five workspaces. The field mission inside it walks ten stages in order, and later stages stay locked until the earlier ones produce their record.</p>
+      <ul class="ws-chips" aria-label="Mission Control workspaces">
+        <li><b>Overview</b> brief, stages, summary</li>
+        <li><b>Investigation</b> evidence map and ledger</li>
+        <li><b>Hypothesis Lab</b> H-ACK against H-QUEUE</li>
+        <li><b>Decision Room</b> proposal, plan, human review</li>
+        <li><b>Chaos Lab</b> inject, detect, repair, retest</li>
+      </ul>
+    </div>
+    <div class="route-wrap">
+      <div class="route-rail" aria-hidden="true"><div class="route-fill" id="routeFill"></div></div>
+      <ol class="route" id="routeList"></ol>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RECORDS ================= -->
+<section class="band gutter rule-top" id="records" aria-labelledby="records-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Durable records</span>
+      <h2 id="records-title">A mission survives a restart. A receipt links only when it can be proven.</h2>
+      <p class="prose">Every accepted change to a mission is saved as a numbered snapshot, so stopping the server loses nothing. A synthetic investigation receipt attaches to a mission run only through an explicit, checkable link, and every check is recomputed from the stored records. A matching ID proves nothing on its own.</p>
+    </div>
+    <div class="records-grid">
+      <div class="panel panel-pad reveal">
+        <span class="field-label">Snapshot revisions · run <span class="mono" id="runId"></span></span>
+        <ol class="revs" id="revs"></ol>
+        <p class="note">Each accepted change writes revision N+1, then moves the active-run pointer. The pointer move is the commit point. If a save fails, the previous state stands: reads continue and changes are refused until a restart reconciles.</p>
+        <span class="field-label" style="margin-top:1.4rem">Link lifecycle · append-only</span>
+        <div class="lifecycle" aria-label="Link statuses">
+          <span class="pill" data-s="ok">active</span><span class="arrow" aria-hidden="true">→</span>
+          <span class="pill" data-s="open">superseded</span><span class="or">or</span>
+          <span class="pill" data-s="miss">revoked</span>
+        </div>
+        <p class="note">A newer link supersedes the old one, and an operator can revoke one. Records are never edited or deleted.</p>
+      </div>
+      <div class="panel term reveal">
+        <div class="panel-bar">
+          <span class="filename">rehearsal · <b>docs/mc-009-1-demonstration.md §B</b></span>
+          <button type="button" class="btn small" id="replayBtn">Replay</button>
+        </div>
+        <div class="term-body" id="term" role="log" aria-label="Rehearsal transcript"></div>
+        <p class="term-foot">Real output, captured from the backend when this page was built. The IDs come from that run.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= BOUNDARY ================= -->
+<section class="band gutter rule-top" id="boundary" aria-labelledby="boundary-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Where the AI stops</span>
+      <h2 id="boundary-title">The model proposes. Rules compute. A person decides.</h2>
+      <p class="prose">The live model is useful for reading messy evidence and laying out competing explanations. It never writes a fact, a metric, or a verdict, and a response that matches the schema is still checked claim by claim after it arrives.</p>
+    </div>
+    <div class="lanes">
+      <div class="panel lane reveal">
+        <span class="who">The model may</span>
+        <h3>Draft and suggest</h3>
+        <ul>
+          <li>Separate policy, stakeholder reports, and recorded events into a truth map</li>
+          <li>Propose at least two competing hypotheses, each with a test that could tell them apart</li>
+          <li>Suggest the next diagnostic and draft a prediction for it</li>
+          <li>Flag conflicts and unknowns rather than resolve them by plausibility</li>
+        </ul>
+      </div>
+      <div class="panel lane reveal">
+        <span class="who">The application enforces</span>
+        <h3>Check every claim</h3>
+        <ul>
+          <li>Quotes must be literal spans of a source document</li>
+          <li>Numbers come only from typed, deterministic calculations</li>
+          <li>Predictions lock and hash before any outcome is revealed</li>
+          <li>Every evidence reference is validated after each response</li>
+          <li>Repairs come from an allowlist and must pass regression checks before recovery is claimed</li>
+        </ul>
+      </div>
+      <div class="panel lane human reveal">
+        <span class="who">A person decides</span>
+        <h3>Approve, reject, or defer</h3>
+        <ul>
+          <li>Proposals are bounded in scope, reversible, and carry stop conditions</li>
+          <li>A written rationale is required for every decision</li>
+          <li>A single-case result never authorizes an organization-wide fix</li>
+          <li>Mission-to-receipt links are explicit operator actions that can be revoked</li>
+          <li>No code path executes a production change</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FACTS ================= -->
+<section class="band gutter rule-top" aria-labelledby="facts-title">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="eyebrow">Built for the Meta AI Hackathon</span>
+      <h2 id="facts-title">Under the hood</h2>
+    </div>
+    <div class="facts">
+      <div class="panel fact reveal"><span class="v mono">muse-spark-1.3</span><span class="d">Live model behind a ModelClient interface, with a scripted deterministic fallback so the outcome never depends on it.</span></div>
+      <div class="panel fact reveal"><span class="v">590 tests</span><span class="d">Automated tests across quotes, calculations, prediction locks, chaos detection and recovery, persistence, and receipt links.</span></div>
+      <div class="panel fact reveal"><span class="v">Restart-safe</span><span class="d">Numbered snapshots with a commit pointer. A restart restores the same run at the same revision.</span></div>
+      <div class="panel fact reveal"><span class="v">0 dependencies</span><span class="d">Python standard library on the server and plain HTML, CSS, and JavaScript in the browser.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CLOSING ================= -->
+<section class="band closing gutter rule-top" aria-labelledby="close-title">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">Indie track · October 26 – November 4, 2026</span>
+      <h2 id="close-title" style="margin-top:1rem">Plan Monday. Investigate Tuesday. Prove it Friday.</h2>
+      <p class="lede" style="margin-top:1.2rem">One place for the failure, the competing explanations, the evidence, the corrective test, and the customer's acceptance criteria, for the whole length of an engagement.</p>
+    </div>
+    <div style="display:grid;gap:1rem">
+      <div class="panel runbox" aria-label="Run it locally">
+        <div class="c"># run the mission console locally</div>
+        <div><code>python3 -m backend.server --port 8000</code></div>
+        <div class="c"># then open localhost:8000/control.html</div>
+      </div>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/JSama99/fde-command-center" target="_blank" rel="noopener">View on GitHub</a>
+        <a class="btn" href="#top">Back to top</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site-foot gutter">
+  <div class="wrap">
+    <span>FDE Command Center · TalonSight · Built with Muse Spark Open</span>
+    <span>Fictional training demonstration. No real customer data.</span>
+  </div>
+</footer>
+
+<script id="case-data" type="application/json">{"events": [{"case_id": "case-001", "triage": "URGENT", "created_at": "2026-09-01T08:00:00", "assigned_at": "2026-09-01T08:20:00", "ack_at": "2026-09-01T10:30:00", "window_close_at": "2026-09-01T18:00:00", "note": "fictional on-time acknowledgment"}, {"case_id": "case-002", "triage": "URGENT", "created_at": "2026-09-01T08:00:00", "assigned_at": "2026-09-01T08:15:00", "ack_at": "2026-09-01T13:30:00", "window_close_at": "2026-09-01T18:00:00", "note": "fictional late acknowledgment"}, {"case_id": "case-003", "triage": "URGENT", "created_at": "2026-09-01T09:00:00", "assigned_at": "2026-09-01T09:10:00", "ack_at": "", "window_close_at": "2026-09-01T18:00:00", "note": "fictional missing acknowledgment with complete window"}, {"case_id": "case-004", "triage": "URGENT", "created_at": "2026-09-01T09:00:00", "assigned_at": "", "ack_at": "", "window_close_at": "2026-09-01T18:00:00", "note": "fictional unassigned with complete window"}, {"case_id": "case-005", "triage": "URGENT", "created_at": "2026-09-01T16:00:00", "assigned_at": "2026-09-01T16:10:00", "ack_at": "", "window_close_at": "2026-09-01T17:00:00", "note": "fictional window closes before deadline"}, {"case_id": "case-006", "triage": "URGENT", "created_at": "2026-09-01T16:30:00", "assigned_at": "", "ack_at": "", "window_close_at": "2026-09-01T17:00:00", "note": "fictional unassigned with incomplete window"}, {"case_id": "case-007", "triage": "ROUTINE", "created_at": "2026-09-01T08:00:00", "assigned_at": "2026-09-01T08:05:00", "ack_at": "2026-09-01T08:30:00", "window_close_at": "2026-09-01T18:00:00", "note": "fictional routine case outside urgent deadlines"}, {"case_id": "case-008", "triage": "URGENT", "created_at": "2026-09-01T10:00:00", "assigned_at": "2026-09-01T11:00:00", "ack_at": "2026-09-01T10:30:00", "window_close_at": "2026-09-01T18:00:00", "note": "fictional acknowledgment recorded before assignment"}], "documents": {"policy": "# Fictional Urgent Referral Policy — case-001\n\nAll content in this file is fictional. No real policy is quoted.\n\nAll URGENT referrals must be assigned to a coordinator within 1 hour of creation.\n\nAll URGENT referrals must receive a recorded acknowledgment within 4 hours of creation.\n\nAn observation window that closes before the 4-hour deadline is incomplete and cannot prove a miss.\n\nRoutine referrals follow the standard queue and are not subject to the urgent deadlines above.\n", "dispatcher": "# Fictional Dispatcher Notes — case-001\n\nAll content in this file is fictional. The speaker is fictional.\n\nI handle the intake queue on weekdays. We usually acknowledge urgent cases the same day.\n\nWhen the queue spikes, we leave some urgent cases unassigned overnight.\n\nThe computer system looks fine to me. I enter what I can and catch up the next morning.\n", "manager": "# Fictional Manager Notes — case-001\n\nAll content in this file is fictional. The speaker is fictional.\n\nNo urgent case ever waits unassigned.\n\nThe dashboard shows 100% on-time acknowledgment for urgent cases.\n\nThe only technical issue I have seen is the floor-2 printer jamming on large jobs.\n"}, "quotes": {"policy_assign": {"doc_id": "policy", "quote": "All URGENT referrals must be assigned to a coordinator within 1 hour of creation.", "start": 113, "end": 194}, "policy_ack": {"doc_id": "policy", "quote": "All URGENT referrals must receive a recorded acknowledgment within 4 hours of creation.", "start": 196, "end": 283}, "dispatcher_overnight": {"doc_id": "dispatcher", "quote": "When the queue spikes, we leave some urgent cases unassigned overnight.", "start": 197, "end": 268}, "manager_unassigned": {"doc_id": "manager", "quote": "No urgent case ever waits unassigned.", "start": 104, "end": 141}, "manager_ack": {"doc_id": "manager", "quote": "The dashboard shows 100% on-time acknowledgment for urgent cases.", "start": 143, "end": 208}, "manager_printer": {"doc_id": "manager", "quote": "The only technical issue I have seen is the floor-2 printer jamming on large jobs.", "start": 210, "end": 292}}, "experiment": {"hypotheses": {"H-QUEUE": "Assignment delays caused by queue handling leave urgent cases unassigned or late.", "H-ACK": "A separate acknowledgment workflow bottleneck or reporting problem loses timely acknowledgments."}, "procedure": "Re-examine the source log for case-003 (assigned 09:10, no acknowledgment in the events feed, complete observation window) and record whether an acknowledgment exists there that never reached the feed.", "criteria": "Predict \"ack-found\" if you expect the source log to hold a case-003 acknowledgment missing from the feed (supports H-ACK); predict \"no-ack\" if you expect no such entry (supports H-QUEUE for the assigned class).", "outcome": {"finding": "ack-found", "detail": "Source-log check for case-003 finds a recorded acknowledgment at 09:40 that never reached the events feed (feed token SRC-FEED-GAP-09:40).", "refs": ["case-003", "events.csv"]}}, "chaos": {"fixtures": {"assign.csv": [{"case_id": "CHS-A", "created_at": "2026-09-10T08:00:00", "assigned_at": "2026-09-10T08:20:00", "ack_at": "2026-09-10T10:00:00", "window_close_at": "2026-09-10T14:00:00"}, {"case_id": "CHS-B", "created_at": "2026-09-10T08:05:00", "assigned_at": "2026-09-10T08:35:00", "ack_at": "", "window_close_at": "2026-09-10T14:00:00"}, {"case_id": "CHS-C", "created_at": "2026-09-10T08:10:00", "assigned_at": "2026-09-10T08:50:00", "ack_at": "", "window_close_at": "2026-09-10T10:00:00"}], "ack_source.csv": [{"case_id": "CHS-A", "ack_at": "2026-09-10T10:00:00"}, {"case_id": "CHS-B", "ack_at": "2026-09-10T11:30:00"}], "ack_feed.csv": [{"case_id": "CHS-A", "ack_at": "2026-09-10T10:00:00"}, {"case_id": "CHS-B", "ack_at": "2026-09-10T11:30:00"}], "window.csv": [{"case_id": "CHS-W1", "created_at": "2026-09-10T08:00:00", "assigned_at": "2026-09-10T08:15:00", "ack_at": "", "window_close_at": "2026-09-10T09:30:00"}, {"case_id": "CHS-W2", "created_at": "2026-09-10T08:00:00", "assigned_at": "2026-09-10T08:15:00", "ack_at": "", "window_close_at": "2026-09-10T14:00:00"}]}, "scenarios": [{"scenario_id": "CHS-ASSIGN-01", "title": "Assignment delay", "fault": "Assignment timestamps shifted +300 minutes on the in-memory copy.", "fixtures": ["assign.csv"]}, {"scenario_id": "CHS-ACK-01", "title": "Acknowledgment feed gap", "fault": "CHS-A acknowledgment dropped from the in-memory feed copy.", "fixtures": ["ack_source.csv", "ack_feed.csv"]}, {"scenario_id": "CHS-WINDOW-01", "title": "Incomplete observation window", "fault": "CHS-W2 window_close moved to 09:00 on the in-memory copy.", "fixtures": ["window.csv"]}], "repairs": [{"scenario_id": "CHS-ASSIGN-01", "repair_id": "restore-assignments", "repair": "Remove the injected +300 minute assignment shift."}, {"scenario_id": "CHS-ACK-01", "repair_id": "reconcile-feed", "repair": "Copy exact source acknowledgments into the feed."}, {"scenario_id": "CHS-WINDOW-01", "repair_id": "none-available", "repair": "No allowlisted repair; yields not-tested."}], "limits": {"assign_min": 60, "ack_min": 240, "shift_min": 300}, "expected_flags": {"CHS-ASSIGN-01.baseline": [], "CHS-ASSIGN-01.injected": ["CHS-A", "CHS-B", "CHS-C"], "CHS-ACK-01.baseline": [], "CHS-ACK-01.injected": ["CHS-A"], "CHS-WINDOW-01.baseline": ["CHS-W1"], "CHS-WINDOW-01.injected": ["CHS-W1", "CHS-W2"]}, "window_note": "Recovery not tested — insufficient verified post-repair evidence. Extending the window would need new synthetic source records showing an acknowledgment arriving inside the extended interval; none exist, and missing timestamps must not be manufactured.", "evaluation": {"confusion": {"true_positives": 2, "false_positives": 0, "true_negatives": 2, "false_negatives": 0}, "safety": {"cases": 2, "correct": 2}, "robustness": {"C9-malformed-record": "pass", "C10-fabricated-flag": "pass"}, "unavailable": [{"case": "C8-order-anomaly", "reason": "no chaos-lab fixture contains an ordering anomaly"}], "overall": "pass", "scope": "synthetic offline evaluation only; passing here does not establish production reliability", "fixture_digest": "57f5d8cb9b94f933aa77356876c45f17b7ec0d65490ce77921dc79272f8460f5"}}, "records": {"run_id": "mr-39a625ec6da249b5", "receipt_id": "76f5b136ba6849e8", "link_id": "89c4b39c5a6a488f", "revisions": [{"rev": 1, "stage": "diagnostic selected", "label": "diagnostic chosen"}, {"rev": 2, "stage": "prediction locked", "label": "prediction locked"}, {"rev": 3, "stage": "result revealed", "label": "outcome revealed"}, {"rev": 4, "stage": "assessed", "label": "assessed"}], "assessment": "supported", "transcript": [{"k": "cmd", "t": "python3 -m backend.server --port 8000"}, {"k": "ok", "t": "No saved mission found. Starting a new mission run."}, {"k": "req", "t": "POST /api/mission/diagnostic  →  200 · snapshot revision 1"}, {"k": "req", "t": "POST /api/experiment/predict  →  200 · snapshot revision 2"}, {"k": "req", "t": "POST /api/experiment/reveal  →  200 · snapshot revision 3"}, {"k": "req", "t": "POST /api/experiment/assess  →  200 · snapshot revision 4"}, {"k": "cmd", "t": "^C   # stop the server, then start it again"}, {"k": "ok", "t": "Mission mr-39a625ec6da249b5 restored at revision 4."}, {"k": "cmd", "t": "python3 -m backend.receipt issue investigation.json"}, {"k": "ok", "t": "RECEIPT: 76f5b136ba6849e8"}, {"k": "cmd", "t": "link_registry create --event post-assessment-link"}, {"k": "ok", "t": "linked: 89c4b39c5a6a488f mr-39a625ec6da249b5 -> 76f5b136ba6849e8 (post-assessment-link)"}, {"k": "cmd", "t": "link_registry verify"}, {"k": "ok", "t": "verified: 89c4b39c5a6a488f all checks pass"}, {"k": "cmd", "t": "link_registry create --event audit-view-link"}, {"k": "bad", "t": "rejected: event-not-ready timestamp audit not viewed; audit link refused"}, {"k": "cmd", "t": "link_registry revoke"}, {"k": "ok", "t": "revoked: 89c4b39c5a6a488f"}, {"k": "cmd", "t": "link_registry verify"}, {"k": "bad", "t": "rejected: 89c4b39c5a6a488f revoked"}]}}</script>
+
+<!-- Pure logic: ported 1:1 from backend/events.py, backend/quotes.py, backend/experiment.py. Tested headlessly against the Python backend. -->
+<script id="fde-logic">
+var FDE = (function () {
+  var HOUR = 3600 * 1000;
+  function t(v) { return v ? new Date(v + "Z").getTime() : null; }
+
+  function anomaly(e) {
+    var c = t(e.created_at), a = t(e.assigned_at), k = t(e.ack_at);
+    if (a !== null && a < c) return true;
+    if (k !== null && k < c) return true;
+    if (a !== null && k !== null && k < a) return true;
+    return false;
+  }
+
+  // Returns { status, checks } for one row. status is one of
+  // ok | miss | open | anom | na (not urgent: outside the deadlines).
+  function classify(e) {
+    if (String(e.triage).trim().toUpperCase() !== "URGENT") {
+      return { status: "na", checks: [] };
+    }
+    var c = t(e.created_at), a = t(e.assigned_at), k = t(e.ack_at), w = t(e.window_close_at);
+    var anom = anomaly(e);
+    var assignedOk = a !== null && a <= c + HOUR;
+    var validAck = !anom && k !== null && k >= c && (a === null || k >= a) && k <= c + 4 * HOUR;
+    var complete = w >= c + 4 * HOUR;
+    var status;
+    if (anom) status = "anom";
+    else if (validAck) status = "ok";
+    else if (complete) status = "miss";
+    else status = "open";
+    var checks = [
+      { id: "assign", r: a === null ? "fail" : (assignedOk ? "pass" : "fail") },
+      { id: "order", r: anom ? "warn" : "pass" },
+      { id: "ack", r: anom ? "skip" : (validAck ? "pass" : "fail") },
+      { id: "window", r: validAck ? "skip" : (complete ? "pass" : "fail") }
+    ];
+    return { status: status, assignedOk: assignedOk, validAck: validAck, complete: complete, anomaly: anom, checks: checks };
+  }
+
+  function summarize(rows) {
+    var out = { eligible: [], with_assignment: [], assigned_within_1h: [], valid_ack_within_4h: [], confirmed_miss: [], anomalous: [], incomplete: [] };
+    rows.forEach(function (e) {
+      var r = classify(e);
+      if (r.status === "na") return;
+      out.eligible.push(e.case_id);
+      if (e.assigned_at) out.with_assignment.push(e.case_id);
+      if (r.assignedOk) out.assigned_within_1h.push(e.case_id);
+      if (r.status === "ok") out.valid_ack_within_4h.push(e.case_id);
+      if (r.status === "miss") out.confirmed_miss.push(e.case_id);
+      if (r.status === "anom") out.anomalous.push(e.case_id);
+      if (r.status === "open") out.incomplete.push(e.case_id);
+    });
+    return out;
+  }
+
+  // backend/quotes.py verify_quote: first verbatim occurrence, else rejected.
+  function verifyQuote(docs, docId, quote) {
+    if (!quote) return { ok: false, reason: "An empty quotation is not verifiable." };
+    var text = docs[docId];
+    if (text === undefined) return { ok: false, reason: "Unknown document." };
+    var start = text.indexOf(quote);
+    if (start < 0) return { ok: false, reason: "Not found verbatim in " + docId + "." };
+    return { ok: true, doc_id: docId, start: start, end: start + quote.length };
+  }
+
+  // Python json.dumps(payload, sort_keys=True, separators=(",", ":")) with ensure_ascii=True.
+  function canonical(v) {
+    if (v === null) return "null";
+    if (typeof v === "boolean") return v ? "true" : "false";
+    if (typeof v === "number") return String(v);
+    if (typeof v === "string") {
+      return JSON.stringify(v).replace(/[\u0080-\uffff]/g, function (ch) {
+        return "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0");
+      });
+    }
+    if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+    var keys = Object.keys(v).sort();
+    return "{" + keys.map(function (k) { return canonical(k) + ":" + canonical(v[k]); }).join(",") + "}";
+  }
+
+  function predictionRecord(finding, observation, criteria, lockedAt) {
+    return {
+      experiment_id: "EXP-001",
+      version: "v1",
+      origin: "human-authored",
+      hypothesis_id: finding === "ack-found" ? "H-ACK" : "H-QUEUE",
+      expected_finding: finding,
+      expected_observation: observation,
+      criteria: criteria,
+      refs: ["case-003", "events.csv"],
+      locked_at: lockedAt
+    };
+  }
+
+  function assess(prediction, outcome) {
+    var match = prediction.expected_finding === outcome.finding;
+    return {
+      result: match ? "supported" : "contradicted",
+      reason: match
+        ? "Predicted " + prediction.expected_finding + " matches the revealed " + outcome.finding + " for " + prediction.hypothesis_id + "."
+        : "Predicted " + prediction.expected_finding + " but revealed " + outcome.finding + " for " + prediction.hypothesis_id + "."
+    };
+  }
+
+
+  // ---- Chaos Lab: ported 1:1 from backend/chaos_simulation.py and backend/chaos_recovery.py ----
+  function cts(s) {
+    s = (s || "").trim();
+    if (!s) return null;
+    return Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), +s.slice(11, 13), +s.slice(14, 16), +(s.slice(17, 19) || 0));
+  }
+  function iso(ms) { return new Date(ms).toISOString().slice(0, 19); }
+  function py(v) { return v === null || v === undefined ? "None" : String(v); }
+
+  function measureAssign(rows, L) {
+    var out = {};
+    rows.forEach(function (r) {
+      var c = cts(r.created_at), a = cts(r.assigned_at), k = cts(r.ack_at), w = cts(r.window_close_at);
+      var delay = a !== null && c !== null ? (a - c) / 60000 : null;
+      var complete = w !== null && c !== null && (w - c) / 60000 >= L.ack_min;
+      var anom = (a !== null && c !== null && a < c) || (k !== null && c !== null && k < c) || (k !== null && a !== null && k < a);
+      var ackValid = k !== null && c !== null && (k - c) / 60000 <= L.ack_min && !anom;
+      var cls = anom ? "anomalous-needs-source-check" : (!complete ? "incomplete" : (!ackValid ? "confirmed-miss" : "acknowledged"));
+      out[r.case_id] = { assign_delay_min: delay, breaches_1h: delay !== null && delay > L.assign_min, window_complete: complete,
+        ordering_anomaly: !!anom, ack_valid: ackValid, classification: cls };
+    });
+    return out;
+  }
+  function feedMap(rows) { var m = {}; rows.forEach(function (r) { m[r.case_id] = r.ack_at; }); return m; }
+  function measureFeed(source, feed, extra) {
+    var keys = {};
+    [source, feed, extra || {}].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
+    var out = {};
+    Object.keys(keys).sort().forEach(function (c) {
+      var s = source.hasOwnProperty(c) ? source[c] : null, f = feed.hasOwnProperty(c) ? feed[c] : null;
+      out[c] = { source_ack: s, feed_ack: f, discrepancy: s !== f };
+    });
+    return out;
+  }
+  function shiftRows(rows, minutes) {
+    return rows.map(function (r) {
+      var x = Object.assign({}, r);
+      if ((x.assigned_at || "").trim()) x.assigned_at = iso(cts(x.assigned_at) + minutes * 60000);
+      return x;
+    });
+  }
+  var ACK_DROPPED = "CHS-A", WINDOW_CASE = "CHS-W2", WINDOW_CLOSE = "2026-09-10T09:00:00";
+
+  function chaosState(fx, L, scenario, variant) {
+    var inj = variant === "injected";
+    if (scenario === "CHS-ASSIGN-01") {
+      var rows = inj ? shiftRows(fx["assign.csv"], L.shift_min) : fx["assign.csv"].map(function (r) { return Object.assign({}, r); });
+      var obs = measureAssign(rows, L);
+      return { kind: "rows", rows: rows, observations: obs, flagged: Object.keys(obs).filter(function (c) { return obs[c].breaches_1h; }).sort() };
+    }
+    if (scenario === "CHS-ACK-01") {
+      var source = feedMap(fx["ack_source.csv"]), base = feedMap(fx["ack_feed.csv"]), feed = Object.assign({}, base);
+      if (inj) delete feed[ACK_DROPPED];
+      var o = measureFeed(source, feed, base);
+      return { kind: "feed", source: source, feed: feed, observations: o, flagged: Object.keys(o).filter(function (c) { return o[c].discrepancy; }).sort() };
+    }
+    var wrows = fx["window.csv"].map(function (r) { var x = Object.assign({}, r); if (inj && x.case_id === WINDOW_CASE) x.window_close_at = WINDOW_CLOSE; return x; });
+    var wo = measureAssign(wrows, L);
+    return { kind: "rows", rows: wrows, observations: wo, flagged: Object.keys(wo).filter(function (c) { return !wo[c].window_complete; }).sort() };
+  }
+
+  function recoveryFlags(m) {
+    return Object.keys(m).filter(function (c) { return m[c].breaches_1h || m[c].discrepancy || m[c].classification === "incomplete"; }).sort();
+  }
+  function allTrue(o) { return Object.keys(o).every(function (k) { return o[k] === true; }); }
+
+  function chaosRecover(fx, L, scenario) {
+    if (scenario === "CHS-WINDOW-01") return { status: "not-tested", post_repair: null, changes: [], regression: {}, target_resolved: false };
+    var changes = [], baseline, faulted, repaired, regression = {}, target, data;
+    if (scenario === "CHS-ASSIGN-01") {
+      var rows = fx["assign.csv"];
+      baseline = measureAssign(rows, L);
+      var fr = shiftRows(rows, L.shift_min);
+      faulted = measureAssign(fr, L);
+      var rr = fr.map(function (r) {
+        var x = Object.assign({}, r);
+        if ((x.assigned_at || "").trim()) {
+          var before = x.assigned_at;
+          x.assigned_at = iso(cts(before) - L.shift_min * 60000);
+          changes.push(x.case_id + " assigned_at " + before + "->" + x.assigned_at);
+        }
+        return x;
+      });
+      repaired = measureAssign(rr, L);
+      data = { kind: "rows", rows: rr };
+      var same = canonical(repaired) === canonical(baseline);
+      target = !Object.keys(repaired).some(function (c) { return repaired[c].breaches_1h; }) && same;
+      regression.baseline_restored = same;
+      regression.preexisting_miss_preserved = !!repaired["CHS-B"] && repaired["CHS-B"].classification === "confirmed-miss";
+      regression.no_new_anomaly = !Object.keys(repaired).some(function (c) { return repaired[c].ordering_anomaly; });
+    } else {
+      var source = feedMap(fx["ack_source.csv"]), feed = feedMap(fx["ack_feed.csv"]);
+      baseline = measureFeed(source, feed);
+      var ff = Object.assign({}, feed); delete ff[ACK_DROPPED];
+      faulted = measureFeed(source, ff);
+      var rf = Object.assign({}, ff);
+      Object.keys(source).forEach(function (c) {
+        var cur = rf.hasOwnProperty(c) ? rf[c] : null;
+        if (cur !== source[c]) { changes.push(c + " feed_ack " + py(cur) + "->" + source[c]); rf[c] = source[c]; }
+      });
+      repaired = measureFeed(source, rf);
+      data = { kind: "feed", source: source, feed: rf };
+      target = !Object.keys(repaired).some(function (c) { return repaired[c].discrepancy; });
+      regression.source_unchanged = Object.keys(repaired).every(function (c) { return baseline.hasOwnProperty(c) && repaired[c].source_ack === baseline[c].source_ack; });
+      regression.no_unexpected_records = Object.keys(repaired).sort().join() === Object.keys(baseline).sort().join();
+      regression.feed_matches_source = Object.keys(repaired).every(function (c) { return repaired[c].feed_ack === repaired[c].source_ack; });
+    }
+    return { status: target && allTrue(regression) ? "verified" : "failed", target_resolved: target, regression: regression, changes: changes,
+      baseline: baseline, fault_observations: faulted, post_repair: repaired, pre_repair_flags: recoveryFlags(faulted), post_repair_flags: recoveryFlags(repaired), data: data };
+  }
+
+  return { classify: classify, summarize: summarize, verifyQuote: verifyQuote, canonical: canonical, predictionRecord: predictionRecord, assess: assess,
+    measureAssign: measureAssign, measureFeed: measureFeed, chaosState: chaosState, chaosRecover: chaosRecover };
+})();
+if (typeof module !== "undefined") module.exports = FDE;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById("case-data").textContent);
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var hasGsap = !!window.gsap && !reduce;
+  if (hasGsap && window.ScrollTrigger) { gsap.registerPlugin(ScrollTrigger); document.documentElement.classList.add("js-gsap"); }
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function el(tag, attrs, html) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (html !== undefined) n.innerHTML = html;
+    return n;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function hm(v) { return v ? v.slice(11, 16) : ""; }
+
+  var STATUS = {
+    ok: { g: "✓", word: "Valid ack", long: "Valid acknowledgment within 4 hours" },
+    miss: { g: "✕", word: "Confirmed miss", long: "Confirmed deadline miss" },
+    open: { g: "○", word: "Incomplete window", long: "Incomplete window, cannot prove a miss" },
+    anom: { g: "!", word: "Source check", long: "Out-of-order timestamps, needs a source check" },
+    na: { g: "–", word: "Routine", long: "Routine referral, outside the urgent deadlines" },
+    dash: { g: "✓", word: "On time", long: "Dashboard reports on time" }
+  };
+
+  var rows = DATA.events;
+  var results = rows.map(FDE.classify);
+  var urgent = rows.map(function (r, i) { return { row: r, res: results[i] }; }).filter(function (x) { return x.res.status !== "na"; });
+  var summary = FDE.summarize(rows);
+  var mode = "dashboard";
+  var selected = "case-003";
+
+  /* ---------- readout + table ---------- */
+  var cells = $("#cells");
+  urgent.forEach(function (x) {
+    cells.appendChild(el("div", { class: "cell", "data-case": x.row.case_id }, '<span class="g"></span>' + x.row.case_id.replace("case-", "")));
+  });
+
+  var body = $("#logBody");
+  rows.forEach(function (r, i) {
+    var tr = el("tr", { tabindex: "0", "data-case": r.case_id, "aria-selected": "false" });
+    if (results[i].status === "na") tr.className = "routine";
+    function td(v) { return v ? "<td>" + esc(hm(v)) + "</td>" : '<td class="blank">—</td>'; }
+    tr.innerHTML = "<td>" + esc(r.case_id) + "</td><td>" + esc(r.triage) + "</td>" + td(r.created_at) + td(r.assigned_at) + td(r.ack_at) + td(r.window_close_at) + '<td class="st"></td>';
+    tr.addEventListener("click", function () { select(r.case_id); });
+    tr.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(r.case_id); } });
+    body.appendChild(tr);
+  });
+
+  var n = summary.eligible.length, okN = summary.valid_ack_within_4h.length;
+  var countsDef = [
+    ["ok", okN, "valid acknowledgment within 4 hours"],
+    ["miss", summary.confirmed_miss.length, "confirmed deadline misses"],
+    ["open", summary.incomplete.length, "incomplete windows, not provable misses"],
+    ["anom", summary.anomalous.length, "out-of-order record, source check"]
+  ];
+  var counts = $("#counts");
+  countsDef.forEach(function (c) {
+    counts.appendChild(el("div", { class: "count", "data-s": c[0] }, '<div class="n">' + c[1] + '</div><div class="l">' + c[2] + " · of " + n + " urgent</div>"));
+  });
+
+  function pillFor(status) {
+    var s = STATUS[status];
+    return '<span class="pill" data-s="' + status + '"><span aria-hidden="true">' + s.g + "</span>" + s.word + "</span>";
+  }
+
+  var bigNum = $("#bigNum"), bigSub = $("#bigSub");
+  var shown = 100;
+  function animateNumber(to) {
+    if (hasGsap) {
+      var o = { v: shown };
+      gsap.to(o, { v: to, duration: 0.9, ease: "power3.out", onUpdate: function () { bigNum.textContent = Math.round(o.v); } });
+    } else { bigNum.textContent = to; }
+    shown = to;
+  }
+
+  var mgrAckQuote = DATA.quotes.manager_ack;
+  function render() {
+    $("#readout").dataset.mode = mode;
+    $$('.seg[data-kind="mode"] button').forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.mode === mode)); });
+    var verified = mode === "verified";
+    animateNumber(verified ? Math.round(100 * okN / n) : 100);
+    bigSub.innerHTML = verified
+      ? "<strong>" + okN + " of " + n + "</strong> eligible urgent cases has a valid acknowledgment within 4 hours. " + summary.confirmed_miss.length + " are confirmed misses.<span class=\"src\">Computed from events.csv by fixed rules</span>"
+      : "Every urgent referral reported as acknowledged on time.<span class=\"src\">Manager: “" + esc(mgrAckQuote.quote) + "”</span>";
+    $("#legend").hidden = !verified;
+    var cellEls = $$(".cell");
+    urgent.forEach(function (x, i) {
+      var s = verified ? x.res.status : "dash";
+      cellEls[i].dataset.s = s;
+      cellEls[i].querySelector(".g").textContent = STATUS[s].g;
+    });
+    $$("#logBody tr").forEach(function (tr, i) {
+      var st = results[i].status;
+      var shownSt = st === "na" ? "na" : (verified ? st : "dash");
+      tr.querySelector(".st").innerHTML = pillFor(shownSt);
+    });
+    if (hasGsap) {
+      gsap.fromTo(".cell", { y: 6, opacity: 0.4 }, { y: 0, opacity: 1, duration: 0.45, stagger: 0.05, ease: "power2.out", overwrite: true });
+      gsap.fromTo("#logBody .pill", { x: -6, opacity: 0.3 }, { x: 0, opacity: 1, duration: 0.4, stagger: 0.04, ease: "power2.out", overwrite: true });
+    }
+    renderTrace();
+  }
+
+  function setMode(m) { if (m !== mode) { mode = m; render(); } }
+  $$('.seg[data-kind="mode"]').forEach(function (seg) {
+    var btns = $$("button", seg);
+    btns.forEach(function (b, i) {
+      b.addEventListener("click", function () { setMode(b.dataset.mode); });
+      b.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault(); var nb = btns[(i + 1) % btns.length]; setMode(nb.dataset.mode); nb.focus();
+        }
+      });
+    });
+  });
+
+  var CHECK_TEXT = {
+    assign: function (r, x) {
+      if (!x.assigned_at) return ["No assignment recorded", "rule: assigned_at ≤ created_at + 1h"];
+      return [(r.assignedOk ? "Assigned within 1 hour" : "Assigned late") + " (" + hm(x.created_at) + " → " + hm(x.assigned_at) + ")", "rule: assigned_at ≤ created_at + 1h"];
+    },
+    order: function (r, x) {
+      return r.anomaly ? ["Acknowledged before assigned (" + hm(x.ack_at) + " < " + hm(x.assigned_at) + ")", "ordering anomaly · not counted as a miss"] : ["Timestamps in order", "created ≤ assigned ≤ ack"];
+    },
+    ack: function (r, x) {
+      if (r.anomaly) return ["Acknowledgment not scored", "out-of-order record is held for a source check"];
+      if (!x.ack_at) return ["No acknowledgment in the feed", "rule: ack recorded ≤ created_at + 4h"];
+      return [(r.validAck ? "Acknowledged within 4 hours" : "Acknowledged late") + " (" + hm(x.created_at) + " → " + hm(x.ack_at) + ")", "rule: ack recorded ≤ created_at + 4h"];
+    },
+    window: function (r, x) {
+      if (r.validAck) return ["Window check not needed", "deadline already met"];
+      return [(r.complete ? "Observation window complete" : "Window closed before the deadline") + " (closes " + hm(x.window_close_at) + ")", "policy: an incomplete window cannot prove a miss"];
+    }
+  };
+  var GLYPH = { pass: "✓", fail: "✕", skip: "–", warn: "!" };
+
+  function renderTrace() {
+    var i = rows.findIndex(function (r) { return r.case_id === selected; });
+    var x = rows[i], r = results[i], box = $("#trace");
+    $$("#logBody tr").forEach(function (tr) { tr.setAttribute("aria-selected", String(tr.dataset.case === selected)); });
+    var html = "<h3>" + esc(x.case_id) + "</h3><div class=\"sub\">" + esc(x.triage) + " · created " + hm(x.created_at) + "</div>";
+    if (r.status === "na") {
+      html += '<div class="verdict" data-s="na"><b>Outside the urgent deadlines</b><span>Routine referrals follow the standard queue. The 1-hour and 4-hour rules do not apply.</span></div>';
+    } else if (mode === "dashboard") {
+      html += '<div class="verdict" data-s="ok"><b>Dashboard: on time</b><span>The dashboard reports 100% on-time acknowledgment. Switch to the event log to check this row against the policy.</span></div>';
+    } else {
+      html += '<ul class="checks">' + r.checks.map(function (c) {
+        var tx = CHECK_TEXT[c.id](r, x);
+        return '<li data-r="' + c.r + '"><span class="gl" aria-hidden="true">' + GLYPH[c.r] + "</span><span>" + esc(tx[0]) + "<small>" + esc(tx[1]) + "</small></span></li>";
+      }).join("") + "</ul>";
+      html += '<div class="verdict" data-s="' + r.status + '"><b>' + STATUS[r.status].g + " " + STATUS[r.status].long + "</b><span>" + esc(x.note.replace(/^fictional /, "Fixture note: ")) + "</span></div>";
+    }
+    box.innerHTML = html;
+  }
+  function select(id) { selected = id; renderTrace(); }
+
+  // Contradiction panels
+  $("#qManager1").textContent = "“" + DATA.quotes.manager_unassigned.quote + "”";
+  $("#qManager1Cap").textContent = "manager.md · characters " + DATA.quotes.manager_unassigned.start + "–" + DATA.quotes.manager_unassigned.end;
+  var unassigned = urgent.filter(function (x) { return !x.row.assigned_at; }).map(function (x) { return x.row.case_id; });
+  $("#cAssign").innerHTML = "Event log: <b>" + unassigned.length + " eligible urgent cases have no assignment</b> (" + unassigned.join(", ") + "). The dispatcher said as much: “" + esc(DATA.quotes.dispatcher_overnight.quote) + "”";
+  $("#qManager2").textContent = "“" + mgrAckQuote.quote + "”";
+  $("#qManager2Cap").textContent = "manager.md · characters " + mgrAckQuote.start + "–" + mgrAckQuote.end;
+  $("#cAck").innerHTML = "Event log: <b>" + okN + " of " + n + " has a valid acknowledgment within 4 hours</b>, and " + summary.confirmed_miss.length + " are confirmed misses. Two more cannot be judged yet because their observation windows closed early.";
+
+  render();
+
+  /* ---------- quote verifier ---------- */
+  var docs = DATA.documents, docIds = ["policy", "dispatcher", "manager"], activeDoc = "policy";
+  var tabs = $("#docTabs"), docView = $("#docView"), qIn = $("#quoteInput"), vRes = $("#vResult");
+  docIds.forEach(function (id) {
+    var b = el("button", { type: "button", role: "tab", "aria-selected": String(id === activeDoc), "data-doc": id }, id + ".md");
+    b.addEventListener("click", function () { activeDoc = id; verify(); });
+    tabs.appendChild(b);
+  });
+  function verify() {
+    $$("#docTabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.doc === activeDoc)); });
+    var text = docs[activeDoc], res = FDE.verifyQuote(docs, activeDoc, qIn.value);
+    if (res.ok) {
+      docView.innerHTML = esc(text.slice(0, res.start)) + "<mark>" + esc(text.slice(res.start, res.end)) + "</mark>" + esc(text.slice(res.end));
+      vRes.dataset.r = "pass";
+      vRes.innerHTML = "<b>✓ Verified quotation</b><span class=\"meta\">doc_id: " + esc(activeDoc) + " · start: " + res.start + " · end: " + res.end + "</span>";
+      var m = docView.querySelector("mark"); if (m && m.scrollIntoView && document.activeElement === qIn) { /* keep page still while typing */ }
+    } else {
+      docView.textContent = text;
+      vRes.dataset.r = "fail";
+      vRes.innerHTML = "<b>✕ Rejected</b><span class=\"meta\">" + esc(res.reason) + " A paraphrase can still be cited as an interpretation, never as a quote.</span>";
+    }
+  }
+  qIn.value = DATA.quotes.policy_ack.quote;
+  qIn.addEventListener("input", verify);
+  var examples = [
+    ["Exact policy text", "policy", DATA.quotes.policy_assign.quote],
+    ["One word changed", "policy", DATA.quotes.policy_ack.quote.replace("4 hours", "same day")],
+    ["The printer remark", "manager", DATA.quotes.manager_printer.quote],
+    ["A summary, not a quote", "dispatcher", "Urgent cases are always acknowledged the same day."]
+  ];
+  var chips = $("#quoteChips");
+  examples.forEach(function (ex) {
+    var c = el("button", { type: "button", class: "chip" }, esc(ex[0]));
+    c.addEventListener("click", function () { activeDoc = ex[1]; qIn.value = ex[2]; verify(); });
+    chips.appendChild(c);
+  });
+  verify();
+
+  /* ---------- prediction lock ---------- */
+  var exp = DATA.experiment;
+  $("#hAckText").textContent = exp.hypotheses["H-ACK"];
+  $("#hQueueText").textContent = exp.hypotheses["H-QUEUE"];
+  var obsDefaults = {
+    "ack-found": "The case-003 source log holds an acknowledgment that never reached the events feed.",
+    "no-ack": "The case-003 source log holds no acknowledgment; the case was assigned and then left unacknowledged."
+  };
+  var obsIn = $("#obsInput"), lockBtn = $("#lockBtn"), revealBtn = $("#revealBtn"), resetBtn = $("#resetBtn"), msg = $("#expMsg");
+  var st = { prediction: null, outcome: null, assessment: null };
+  $$('input[name="finding"]').forEach(function (inp) {
+    inp.addEventListener("change", function () {
+      var cur = obsIn.value.trim();
+      if (!cur || cur === obsDefaults["ack-found"] || cur === obsDefaults["no-ack"]) obsIn.value = obsDefaults[inp.value];
+      msg.textContent = "";
+    });
+  });
+
+  function sha256(str) {
+    if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.resolve(null);
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+    }).catch(function () { return null; });
+  }
+
+  function renderLedger() {
+    var L = $("#ledger"), p = st.prediction, o = st.outcome, a = st.assessment;
+    var html = "";
+    html += '<div class="entry" data-on="true"><h4>Question registered</h4><div class="body">' + esc(exp.procedure) + "</div></div>";
+    html += '<div class="entry" data-k="lock" data-on="' + (!!p) + '"><h4>' + (p ? "Prediction locked" : "Prediction not locked yet") + '</h4><div class="body">' +
+      (p ? "Cannot be edited from here on." + '<div class="record"><b>hypothesis</b> ' + esc(p.hypothesis_id) + " · <b>expects</b> " + esc(p.expected_finding) +
+        "<br><b>locked_at</b> " + p.locked_at + "<br><b>sha256</b> " + esc(p.hash || "unavailable in this browser") + "</div>"
+        : "The outcome stays sealed until a prediction with an observation is locked.") + "</div></div>";
+    html += '<div class="entry" data-on="' + (!!o) + '"><h4>' + (o ? "Source log revealed" : "Source log sealed") + '</h4><div class="body">' +
+      (o ? esc(o.detail) : "Reveal is refused before a valid lock.") + "</div></div>";
+    html += '<div class="entry" data-on="' + (!!a) + '"><h4>Deterministic assessment</h4><div class="body">' +
+      (a ? '<div class="assess" data-r="' + a.result + '"><b>' + (a.result === "supported" ? "✓ Supported" : "✕ Contradicted") + "</b><span>" + esc(a.reason) + "</span><span>" +
+        (a.result === "supported" ? "Agreement is support, not proof. H-QUEUE stays open for the two unassigned cases." : "The locked expectation did not match. The record keeps your prediction exactly as locked, and the next step is more verification, not remediation.") + "</span></div>"
+        : "Compares the locked prediction with the revealed outcome by rule.") + "</div></div>";
+    L.innerHTML = html;
+    if (hasGsap) gsap.fromTo("#ledger .entry[data-on='true']:last-of-type", { opacity: 0.4 }, { opacity: 1, duration: 0.5 });
+  }
+
+  $("#expForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (st.prediction) return;
+    var pick = $('input[name="finding"]:checked');
+    if (!pick) { msg.textContent = "Choose ack-found or no-ack first."; return; }
+    var obs = obsIn.value.trim();
+    if (!obs) { msg.textContent = "Write what you expect to observe. An empty prediction cannot be locked."; obsIn.focus(); return; }
+    var rec = FDE.predictionRecord(pick.value, obs, exp.criteria, Math.floor(Date.now() / 1000));
+    sha256(FDE.canonical(rec)).then(function (h) {
+      rec.hash = h;
+      st.prediction = rec;
+      $$('input[name="finding"]').forEach(function (i) { i.disabled = true; });
+      obsIn.readOnly = true;
+      lockBtn.disabled = true;
+      revealBtn.disabled = false;
+      resetBtn.hidden = false;
+      msg.textContent = "Locked. Now reveal the source log.";
+      renderLedger();
+      revealBtn.focus();
+    });
+  });
+
+  revealBtn.addEventListener("click", function () {
+    if (!st.prediction || st.outcome) return;
+    st.outcome = exp.outcome;
+    st.assessment = FDE.assess(st.prediction, st.outcome);
+    revealBtn.disabled = true;
+    msg.textContent = st.assessment.result === "supported" ? "Your prediction held." : "Your prediction was contradicted, and the record says so.";
+    renderLedger();
+  });
+
+  resetBtn.addEventListener("click", function () {
+    st = { prediction: null, outcome: null, assessment: null };
+    $$('input[name="finding"]').forEach(function (i) { i.disabled = false; i.checked = false; });
+    obsIn.readOnly = false; obsIn.value = "";
+    lockBtn.disabled = false; revealBtn.disabled = true; resetBtn.hidden = true;
+    msg.textContent = "";
+    renderLedger();
+  });
+  renderLedger();
+
+  /* ---------- route ---------- */
+  var STAGES = [
+    ["Brief", "brief", "Urgent referrals go unacknowledged while the dispatch system looks healthy. The task: find which explanation fits and recommend a reversible next step."],
+    ["Constraint", "constraint", "Pin the operating rules as verified policy quotations: assign within 1 hour, acknowledge within 4."],
+    ["Evidence", "evidence", "Compute from the event log by fixed rules. Stakeholder statements stay attributed and never merge into fact."],
+    ["Hypotheses", "hypotheses", "Hold competing explanations side by side: queue handling (H-QUEUE) against an acknowledgment workflow gap (H-ACK)."],
+    ["Diagnostic", "diagnostic", "Pick one follow-up: the acknowledgment-feed probe with a withheld outcome, or the deterministic timestamp audit."],
+    ["Predict", "predict", "Lock a testable prediction with a timestamp and hash before the outcome is visible."],
+    ["Reveal", "reveal", "The server discloses the outcome only after a valid lock."],
+    ["Reassess", "reassess", "Rules compare prediction with outcome: supported or contradicted. Support is never treated as proof."],
+    ["Decide", "decide", "Approve, reject, or defer a bounded proposal with risks, stop conditions, and the next responsible role. A rationale is required."],
+    ["Report", "report", "Generate the 13-section engineering record, ending with the statement that no production action was executed."]
+  ];
+  var list = $("#routeList");
+  STAGES.forEach(function (s) {
+    list.appendChild(el("li", { class: "stage" }, "<h3>" + s[0] + '<span class="k" style="display:block">stage: ' + s[1] + "</span></h3><p>" + esc(s[2]) + "</p>"));
+  });
+
+
+  /* ---------- chaos lab ---------- */
+  var CH = DATA.chaos, L = CH.limits;
+  var SCN = {
+    "CHS-ASSIGN-01": { file: "assign.csv", repair: "restore-assignments" },
+    "CHS-ACK-01": { file: "ack_source.csv + ack_feed.csv", repair: "reconcile-feed" },
+    "CHS-WINDOW-01": { file: "window.csv", repair: null }
+  };
+  var CLS = {
+    "acknowledged": ["ok", "Acknowledged"], "confirmed-miss": ["miss", "Confirmed miss"],
+    "incomplete": ["open", "Incomplete"], "anomalous-needs-source-check": ["anom", "Source check"]
+  };
+  var DETECTORS = {
+    "CHS-ASSIGN-01": ["assignment-delay-1h", "flag cases with assigned_at − created_at > " + L.assign_min + " minutes"],
+    "CHS-ACK-01": ["feed-source-reconciliation", "flag cases where source and feed acknowledgments differ"],
+    "CHS-WINDOW-01": ["window-observability", "flag cases whose window closes before created_at + " + L.ack_min + " minutes"]
+  };
+  var REG = {
+    baseline_restored: "Every measurement matches the baseline again",
+    preexisting_miss_preserved: "CHS-B is still a confirmed miss. It was wrong before the fault, and a repair must not hide that",
+    no_new_anomaly: "No new ordering anomaly",
+    source_unchanged: "Source records untouched",
+    no_unexpected_records: "No records added or removed",
+    feed_matches_source: "Feed matches source for every case"
+  };
+  var recov = {};
+  CH.scenarios.forEach(function (s) { recov[s.scenario_id] = FDE.chaosRecover(CH.fixtures, L, s.scenario_id); });
+  var cScn = "CHS-ASSIGN-01", cStage = "injected";
+
+  var tabsEl = $("#chaosTabs");
+  CH.scenarios.forEach(function (s) {
+    var r = recov[s.scenario_id];
+    var b = el("button", { type: "button", role: "tab", class: "chaos-tab", "data-scn": s.scenario_id, "aria-selected": "false" },
+      '<span class="sid">' + esc(s.scenario_id) + '</span><span class="ttl">' + esc(s.title) + '</span><span class="st" data-s="' + (r.status === "verified" ? "ok" : "na") + '">' +
+      (r.status === "verified" ? "✓ recovery verified" : "– recovery not tested") + "</span>");
+    b.addEventListener("click", function () { cScn = s.scenario_id; renderChaos(); });
+    tabsEl.appendChild(b);
+  });
+  var stagesEl = $("#chaosStages");
+  [["baseline", "Baseline"], ["injected", "Fault injected"], ["repaired", "Repair + retest"]].forEach(function (st, i, arr) {
+    var b = el("button", { type: "button", role: "radio", "aria-checked": "false", "data-stage": st[0] }, st[1]);
+    b.addEventListener("click", function () { cStage = st[0]; renderChaos(); });
+    b.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault(); var j = (i + (e.key === "ArrowRight" ? 1 : arr.length - 1)) % arr.length; cStage = arr[j][0]; renderChaos(); $$("button", stagesEl)[j].focus();
+      }
+    });
+    stagesEl.appendChild(b);
+  });
+
+  function clsPill(c) { var m = CLS[c]; return '<span class="pill" data-s="' + m[0] + '">' + m[1] + "</span>"; }
+  function cell(val, base, prev) {
+    var v = val || "", b = base || "";
+    if (!v) return b ? '<td class="changed"><span class="was">' + esc(hm(b)) + "</span>missing</td>" : '<td class="blank">—</td>';
+    if (cStage === "repaired" && prev !== undefined && (prev || "") !== v) return '<td class="restored"><span class="was">' + esc(hm(prev)) + "</span>" + esc(hm(v)) + "</td>";
+    if (v !== b) return '<td class="changed">' + (b ? '<span class="was">' + esc(hm(b)) + "</span>" : "") + esc(hm(v)) + "</td>";
+    return "<td>" + esc(hm(v)) + "</td>";
+  }
+
+  function renderChaos() {
+    $$(".chaos-tab").forEach(function (t) { t.setAttribute("aria-selected", String(t.dataset.scn === cScn)); });
+    $$("button", stagesEl).forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.stage === cStage)); });
+    var spec = CH.scenarios.filter(function (s) { return s.scenario_id === cScn; })[0];
+    var base = FDE.chaosState(CH.fixtures, L, cScn, "baseline");
+    var inj = FDE.chaosState(CH.fixtures, L, cScn, "injected");
+    var r = recov[cScn];
+    var noRepair = cStage === "repaired" && r.status === "not-tested";
+    var cur = cStage === "baseline" ? base : (cStage === "injected" || noRepair ? inj : r.data);
+    var obs = cStage === "repaired" && !noRepair ? r.post_repair : cur.observations;
+    var flagged = cStage === "repaired" && !noRepair ? r.post_repair_flags : cur.flagged;
+    if (cStage === "repaired" && !noRepair && cScn !== "CHS-WINDOW-01") {
+      // Detector alerts on the retested copy use the scenario's own rule.
+      flagged = Object.keys(obs).filter(function (c) { return cScn === "CHS-ASSIGN-01" ? obs[c].breaches_1h : obs[c].discrepancy; }).sort();
+    }
+    $("#chaosFile").innerHTML = "fixtures/chaos-lab/<b>" + esc(SCN[cScn].file) + "</b>";
+    var t = $("#chaosTable"), html;
+    if (cur.kind === "feed") {
+      html = '<thead><tr><th scope="col">Case</th><th scope="col">Source ack</th><th scope="col">Feed ack</th><th scope="col">Match</th><th scope="col">Detector</th></tr></thead><tbody>';
+      Object.keys(obs).forEach(function (c) {
+        var o = obs[c], bf = base.feed[c], pf = inj.feed.hasOwnProperty(c) ? inj.feed[c] : null;
+        html += "<tr><td>" + esc(c) + "</td>" + cell(o.source_ack, base.source[c]) + cell(o.feed_ack, bf, pf) +
+          "<td>" + (o.discrepancy ? '<span class="pill" data-s="miss">✕ differs</span>' : '<span class="pill" data-s="ok">✓ same</span>') + "</td>" +
+          "<td>" + (flagged.indexOf(c) >= 0 ? '<span class="flag">⚑ flagged</span>' : '<span class="blank">—</span>') + "</td></tr>";
+      });
+    } else {
+      var showWindow = cScn === "CHS-WINDOW-01";
+      html = '<thead><tr><th scope="col">Case</th><th scope="col">Created</th><th scope="col">Assigned</th><th scope="col">Ack</th><th scope="col">Window closes</th><th scope="col">' + (showWindow ? "Window" : "Delay") + '</th><th scope="col">Policy class</th><th scope="col">Detector</th></tr></thead><tbody>';
+      cur.rows.forEach(function (row, i) {
+        var o = obs[row.case_id], b = base.rows[i], p = inj.rows[i];
+        var mid = showWindow ? (o.window_complete ? "complete" : "closes early") : (o.assign_delay_min === null ? "—" : Math.round(o.assign_delay_min) + " min");
+        var midCls = showWindow ? (o.window_complete ? "" : ' class="changed"') : (o.breaches_1h ? ' class="changed"' : "");
+        html += "<tr><td>" + esc(row.case_id) + "</td>" + cell(row.created_at, b.created_at) + cell(row.assigned_at, b.assigned_at, p.assigned_at) +
+          cell(row.ack_at, b.ack_at) + cell(row.window_close_at, b.window_close_at, p.window_close_at) +
+          "<td" + midCls + ">" + esc(mid) + "</td><td>" + clsPill(o.classification) + "</td>" +
+          "<td>" + (flagged.indexOf(row.case_id) >= 0 ? '<span class="flag">⚑ flagged</span>' : '<span class="blank">—</span>') + "</td></tr>";
+      });
+    }
+    t.innerHTML = html + "</tbody>";
+
+    var faultText = {
+      baseline: "<b>Baseline.</b> The fixture as written, before any fault.",
+      injected: "<b>Fault.</b> " + esc(spec.fault) + " Only an in-memory copy changes; the fixture file is never written.",
+      repaired: r.status === "not-tested" ? "<b>No repair.</b> Showing the faulted copy. There is no allowlisted correction for this fault." :
+        "<b>Repair.</b> " + esc(CH.repairs.filter(function (x) { return x.scenario_id === cScn; })[0].repair) + " Then the same yardstick measures everything again."
+    };
+    $("#chaosFault").innerHTML = faultText[cStage];
+
+    var det = DETECTORS[cScn], side = "";
+    side += '<span class="side-label">Detector</span><h3>' + esc(det[0]) + '</h3><div class="side-rule">' + esc(det[1]) + "</div>";
+    if (cStage !== "repaired" || noRepair) {
+      var variant = cStage === "baseline" ? "baseline" : "injected";
+      var expected = CH.expected_flags[cScn + "." + variant];
+      var agree = expected.join() === cur.flagged.join();
+      side += '<span class="side-label">Alerts</span><div class="flags">' + (cur.flagged.length ? cur.flagged.map(function (c) { return "<code>" + esc(c) + "</code>"; }).join("") : '<span class="none">No alerts</span>') + "</div>";
+      if (!noRepair) {
+        side += '<div class="verdict" data-s="' + (agree ? "ok" : "miss") + '"><b>' + (agree ? "✓ Matches the controlled truth" : "✕ Disagrees with the controlled truth") + "</b><span>" +
+          (variant === "baseline" ? (cur.flagged.length ? "CHS-W1's window already closes early in the fixture, so it is flagged as incomplete, never as a miss." : "A quiet baseline. Alerts here would be false positives.") :
+            "The fault is known, so agreement measures the detector's accuracy. It is not an independent discovery.") + "</span></div>";
+      } else {
+        side += '<div class="verdict" data-s="na"><b>– Recovery not tested</b><span>' + esc(CH.window_note) + "</span></div>";
+      }
+    } else {
+      side += '<span class="side-label">Changes made</span><ul class="changes">' + r.changes.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") + "</ul>";
+      side += '<span class="side-label">Retest</span><ul class="checks">';
+      side += '<li data-r="' + (r.target_resolved ? "pass" : "fail") + '"><span class="gl" aria-hidden="true">' + (r.target_resolved ? "✓" : "✕") + "</span><span>Target condition resolved<small>" +
+        (cScn === "CHS-ASSIGN-01" ? "no case breaches the 1-hour rule" : "no source and feed discrepancy") + "</small></span></li>";
+      Object.keys(r.regression).forEach(function (k) {
+        var ok = r.regression[k];
+        side += '<li data-r="' + (ok ? "pass" : "fail") + '"><span class="gl" aria-hidden="true">' + (ok ? "✓" : "✕") + "</span><span>" + esc(REG[k] || k) + "<small>regression: " + esc(k) + "</small></span></li>";
+      });
+      side += "</ul>";
+      side += '<div class="verdict" data-s="' + (r.status === "verified" ? "ok" : "miss") + '"><b>' + (r.status === "verified" ? "✓ Recovery verified" : "✕ Recovery failed") + "</b><span>" +
+        (r.status === "verified" ? "The target is resolved and every regression check passes. A repaired copy alone would not have been enough." : "At least one check failed, so nothing is called recovered.") + "</span></div>";
+    }
+    $("#chaosSide").innerHTML = side;
+    if (hasGsap) gsap.fromTo("#chaosTable tbody tr", { opacity: 0.5 }, { opacity: 1, duration: 0.35, stagger: 0.04, overwrite: true });
+  }
+  renderChaos();
+
+  var E = CH.evaluation, cf = E.confusion;
+  var rejected = Object.keys(E.robustness).filter(function (k) { return E.robustness[k] === "pass"; }).length;
+  $("#scoreboard").innerHTML =
+    '<div class="score" data-s="ok"><span class="n">' + cf.true_positives + '</span><span class="l">true positives · injected faults caught</span></div>' +
+    '<div class="score" data-s="' + (cf.false_positives ? "miss" : "ok") + '"><span class="n">' + cf.false_positives + '</span><span class="l">false positives · alerts on a clean baseline</span></div>' +
+    '<div class="score" data-s="ok"><span class="n">' + cf.true_negatives + '</span><span class="l">true negatives · quiet baselines</span></div>' +
+    '<div class="score" data-s="' + (cf.false_negatives ? "miss" : "ok") + '"><span class="n">' + cf.false_negatives + '</span><span class="l">false negatives · faults missed</span></div>' +
+    '<div class="score extra" data-s="ok"><span class="n">' + E.safety.correct + " of " + E.safety.cases + '</span><span class="l">safety cases: incomplete windows are never called misses</span></div>' +
+    '<div class="score wide"><span><b>Rejected inputs:</b> ' + rejected + " of " + Object.keys(E.robustness).length + " (a malformed record, a fabricated flag)</span>" +
+    E.unavailable.map(function (u) { return "<span><b>Not measured:</b> " + esc(u.case.replace(/^C\d+-/, "").replace(/-/g, " ")) + " detection, because " + esc(u.reason) + "</span>"; }).join("") +
+    "<span><b>Scope:</b> " + esc(E.scope.split(";").map(function (x) { x = x.trim(); return x.charAt(0).toUpperCase() + x.slice(1); }).join(". ")) + ".</span></div>";
+
+  /* ---------- records ---------- */
+  var R = DATA.records;
+  $("#runId").textContent = R.run_id;
+  var revs = $("#revs");
+  R.revisions.forEach(function (v) {
+    revs.appendChild(el("li", {}, '<span class="r">rev ' + v.rev + "</span><span>" + esc(v.label.charAt(0).toUpperCase() + v.label.slice(1)) + '</span><span class="sg">' + esc(v.stage) + "</span>"));
+  });
+  var last = R.revisions[R.revisions.length - 1];
+  revs.appendChild(el("li", { class: "restart" }, '<span class="r">restart</span><span>Same run restored at revision ' + last.rev + '</span><span class="sg">restored</span>'));
+  var term = $("#term");
+  R.transcript.forEach(function (ln) { term.appendChild(el("div", { class: "ln " + ln.k }, esc(ln.t))); });
+  var replay = $("#replayBtn");
+  if (!hasGsap) replay.hidden = true;
+  else replay.addEventListener("click", function () {
+    gsap.fromTo("#term .ln", { opacity: 0, x: -6 }, { opacity: 1, x: 0, duration: 0.22, stagger: 0.16, ease: "power1.out", overwrite: true });
+  });
+
+  /* ---------- motion tier 3 ---------- */
+  if (hasGsap) {
+    gsap.from(".hero h1 .line", { y: 28, opacity: 0, duration: 0.9, stagger: 0.14, ease: "power3.out" });
+    gsap.from(".hero .lede, .hero .ctas, .hero .fine", { y: 16, opacity: 0, duration: 0.8, stagger: 0.08, delay: 0.25, ease: "power3.out" });
+    gsap.from("#readout", { y: 24, opacity: 0, duration: 1, delay: 0.15, ease: "power3.out" });
+    // The signature beat: the instrument flips from the claim to the record once, then hands control to the visitor.
+    var autoFlip = gsap.delayedCall(2.2, function () { if (mode === "dashboard") setMode("verified"); });
+    $$('.seg[data-kind="mode"] button').forEach(function (b) { b.addEventListener("click", function () { autoFlip.kill(); }, { once: true }); });
+
+    if (window.ScrollTrigger) {
+      gsap.fromTo("#routeFill", { scaleY: 0 }, { scaleY: 1, ease: "none", scrollTrigger: { trigger: "#routeList", start: "top 70%", end: "bottom 60%", scrub: 0.4 } });
+      $$(".stage").forEach(function (s) {
+        gsap.from(s, { opacity: 0.6, x: -8, duration: 0.6, ease: "power2.out", scrollTrigger: { trigger: s, start: "top 85%" } });
+      });
+      $$(".reveal").forEach(function (r) {
+        gsap.from(r, { y: 14, opacity: 0.6, duration: 0.8, ease: "power3.out", scrollTrigger: { trigger: r, start: "top 88%" } });
+      });
+    }
+  } else {
+    $("#routeFill").style.transform = "scaleY(1)";
+  }
+})();
+</script>
+
+</body>
+</html>
